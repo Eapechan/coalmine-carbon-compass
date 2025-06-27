@@ -9,32 +9,56 @@ import { useToast } from "@/hooks/use-toast";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import { useData } from "@/contexts/DataContext";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { geminiService, GeminiMessage } from "@/lib/gemini";
+import { formatCO2Tonnes } from "@/lib/calculations";
+import { config } from "@/lib/config";
+import { Sparkles, Plus } from 'lucide-react';
+
+// Define a Strategy type at the top:
+type Strategy = {
+  id: string;
+  title: string;
+  category: string;
+  priority: string;
+  description: string;
+  co2Reduction: string;
+  costSaving: string;
+  investment: string;
+  roi: string;
+  implementation: string;
+  impact: number;
+  feasibility: number;
+  aiConfidence: number;
+};
 
 const Strategy = () => {
   const { toast } = useToast();
   const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
-  const [detailsStrategy, setDetailsStrategy] = useState<any | null>(null);
+  const [detailsStrategy, setDetailsStrategy] = useState<Strategy | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [chatMessages, setChatMessages] = useState<GeminiMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const [chatProvider, setChatProvider] = useState<'llama3'>('llama3');
-  const [llamaError, setLlamaError] = useState<string | null>(null);
+  const [aiProvider, setAiProvider] = useState<'gemini'>('gemini');
+  const [geminiError, setGeminiError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [chatPosition, setChatPosition] = useState({ x: 0, y: 0 });
   const chatPanelRef = useRef<HTMLDivElement>(null);
 
-  const OLLAMA_URL = "http://localhost:11434/api/chat";
-  const OLLAMA_MODEL = "llama3";
-
-  const { emissions, getTotalEmissions, getTotalCarbonSinks, getNetEmissions, getReductionPercentage } = useData();
+  const { emissions, carbonSinks, strategies, getTotalEmissions, getTotalCarbonSinks, getNetEmissions, getReductionPercentage } = useData();
   const totalEmissions = getTotalEmissions();
   const totalCarbonSinks = getTotalCarbonSinks();
   const netEmissions = getNetEmissions();
   const reductionPercentage = getReductionPercentage();
+
+  // Calculate sustainability score
+  const sustainabilityScore = Math.min(10, Math.max(0, 
+    (reductionPercentage / 10) + (netEmissions < totalEmissions * 0.5 ? 5 : 0) + 
+    (strategies.filter(s => s.status === 'completed').length * 2)
+  ));
 
   const strategicRecommendations = [
     {
@@ -143,45 +167,80 @@ const Strategy = () => {
     }
   };
 
-  async function sendMessageToLlama3(message: string) {
+  async function sendMessageToGemini(message: string) {
     setChatMessages((msgs) => [...msgs, { role: 'user', content: message }]);
     setChatInput("");
-    setLlamaError(null);
+    setGeminiError(null);
     setLoading(true);
+    
     try {
-      const dashboardContext = `Dashboard Data:\nTotal Emissions: ${totalEmissions} tonnes\nTotal Carbon Sinks: ${totalCarbonSinks} tonnes\nNet Emissions: ${netEmissions} tonnes\nReduction %: ${reductionPercentage.toFixed(1)}%\nRecent Emissions: ${emissions.slice(0, 3).map(e => `${e.activityType} (${e.co2e} t on ${e.date})`).join('; ')}`;
-      const res = await fetch(OLLAMA_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: OLLAMA_MODEL,
-          messages: [
-            { role: "system", content: dashboardContext },
-            { role: "user", content: message }
-          ],
-          stream: false
-        }),
-      });
+      const dashboardContext = {
+        totalEmissions,
+        totalCarbonSinks,
+        netEmissions,
+        reductionPercentage,
+        sustainabilityScore
+      };
+
+      const response = await geminiService.chatWithAssistant(
+        message,
+        chatMessages,
+        dashboardContext
+      );
+
       setLoading(false);
-      if (!res.ok) {
-        setLlamaError("Llama 3 (Ollama) error: " + res.status + " " + res.statusText);
-        setChatMessages((msgs) => [...msgs, { role: 'assistant', content: "Sorry, Llama 3 (Ollama) is not available. Please ensure Ollama is running and the model is pulled." }]);
-        return;
-      }
-      const data = await res.json();
-      const aiMsg = data.message?.content || "(No response)";
-      setChatMessages((msgs) => [...msgs, { role: 'assistant', content: aiMsg }]);
+      setChatMessages((msgs) => [...msgs, { role: 'model', content: response }]);
       setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     } catch (err) {
       setLoading(false);
-      setLlamaError("Network or Ollama error: " + (err instanceof Error ? err.message : String(err)));
-      setChatMessages((msgs) => [...msgs, { role: 'assistant', content: "Sorry, there was an error contacting Llama 3 (Ollama). Please ensure Ollama is running." }]);
+      setGeminiError("Gemini AI error: " + (err instanceof Error ? err.message : String(err)));
+      setChatMessages((msgs) => [...msgs, { 
+        role: 'model', 
+        content: "Sorry, there was an error contacting Gemini AI. Please check your internet connection and try again." 
+      }]);
     }
   }
 
   async function handleSendChat(message: string) {
-    await sendMessageToLlama3(message);
+    await sendMessageToGemini(message);
   }
+
+  async function generateAIInsights() {
+    setLoading(true);
+    try {
+      const emissionsData = {
+        totalEmissions,
+        totalCarbonSinks,
+        netEmissions,
+        reductionPercentage
+      };
+
+      const insights = await geminiService.generateStrategyRecommendations(
+        emissionsData,
+        carbonSinks,
+        strategies
+      );
+
+      setChatMessages([{ role: 'model', content: insights }]);
+      setChatOpen(true);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to generate AI insights. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Helper to get a user-friendly model name
+  const getModelDisplayName = (model: string) => {
+    if (model === 'gemini-1.5-flash') return 'Gemini 1.5 Flash';
+    if (model === 'gemini-2.0-flash') return 'Gemini 2.0 Flash';
+    if (model === 'gemini-pro') return 'Gemini Pro';
+    return model;
+  };
 
   return (
     <div className="space-y-6">
@@ -189,7 +248,7 @@ const Strategy = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">AI Strategy Recommendations</h1>
-          <p className="text-gray-600 mt-1">Personalized carbon reduction strategies for your mine</p>
+          <p className="text-gray-600 mt-1">Personalized carbon reduction strategies powered by AI Assistant</p>
         </div>
         <div className="flex items-center space-x-4">
           <Select defaultValue="all-categories">
@@ -204,16 +263,33 @@ const Strategy = () => {
               <SelectItem value="process-optimization">Process Optimization</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">Generate New Analysis</Button>
+          <Button 
+            variant="outline" 
+            onClick={generateAIInsights}
+            disabled={loading}
+            className="flex items-center space-x-2"
+          >
+            {loading ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span>Generating...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-5 h-5 text-blue-500 mr-1" />
+                <span>Generate AI Analysis</span>
+              </>
+            )}
+          </Button>
         </div>
       </div>
 
       {/* AI Analysis Summary */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+      <Card className="eco-card animate-slide-up">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
             <span className="text-2xl">🤖</span>
-            <span>AI Analysis Summary</span>
+            <span>AI Assistant Analysis Summary</span>
           </CardTitle>
           <CardDescription>
             Based on your mine's emission profile and industry best practices
@@ -393,7 +469,7 @@ const Strategy = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
               <CardHeader>
-                <CardTitle>AI Model Performance</CardTitle>
+                <CardTitle>AI Assistant Model Performance</CardTitle>
                 <CardDescription>
                   How our recommendation engine analyzed your data
                 </CardDescription>
@@ -415,12 +491,16 @@ const Strategy = () => {
                   <span className="text-sm">Similar Mines Analyzed</span>
                   <span className="font-semibold">247</span>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-sm">AI Provider</span>
+                  <span className="font-semibold text-blue-600">{getModelDisplayName(config.gemini.model)}</span>
+                </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Smart Assistant</CardTitle>
+                <CardTitle>AI Assistant</CardTitle>
                 <CardDescription>
                   AI-powered guidance for your carbon journey
                 </CardDescription>
@@ -435,8 +515,14 @@ const Strategy = () => {
                   </div>
                   <div className="p-3 bg-green-50 rounded-lg">
                     <p className="text-sm">
-                      <strong>🎯 Goal Insight:</strong> You're 67% of the way to your 2024 
+                      <strong>🎯 Goal Insight:</strong> You're {Math.round((reductionPercentage / 30) * 100)}% of the way to your 2024 
                       reduction target. Focus on transportation electrification to close the gap.
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-50 rounded-lg">
+                    <p className="text-sm">
+                      <strong>🤖 AI Recommendation:</strong> Your sustainability score of {sustainabilityScore.toFixed(1)}/10 indicates 
+                      strong progress. Consider methane capture systems for maximum impact.
                     </p>
                   </div>
                   <Button className="w-full" variant="outline" onClick={() => setChatOpen(true)}>
@@ -521,9 +607,9 @@ const Strategy = () => {
           onClick={() => setChatOpen(true)}
           className="fixed bottom-6 right-6 z-50 bg-white/60 backdrop-blur-md shadow-lg rounded-full p-4 border border-white/30 hover:bg-white/80 transition flex items-center gap-2"
           style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
-          aria-label="Open AI Chat Assistant"
+          aria-label="Open AI Assistant Chat"
         >
-          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8M12 8v8" /></svg>
+          <Plus className="w-7 h-7 text-green-600 animate-bounce" />
           <span className="font-semibold text-blue-700 hidden md:inline">AI Assistant</span>
         </button>
       )}
@@ -576,12 +662,12 @@ const Strategy = () => {
                 </AlertDescription>
               </Alert>
             )}
-            {llamaError && (
+            {geminiError && (
               <Alert variant="destructive" className="mb-4 mt-2">
-                <AlertTitle>Llama 3 (Ollama) Error</AlertTitle>
+                <AlertTitle>AI Assistant Error</AlertTitle>
                 <AlertDescription>
-                  {llamaError}<br />
-                  <span>Please ensure Ollama is running and the Llama 3 model is available locally.</span>
+                  {geminiError}<br />
+                  <span>Please check your API key, endpoint, and internet connection. (Gemini AI is a cloud service, not a local model.)</span>
                 </AlertDescription>
               </Alert>
             )}
@@ -591,14 +677,44 @@ const Strategy = () => {
                 <div className="text-gray-400 text-center mt-12">Start the conversation...</div>
               )}
               {chatMessages.map((msg, idx) => (
-                <div key={idx} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`rounded-lg px-4 py-2 max-w-xs ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white/80 text-gray-900 border border-white/40'}`}>{
-                    msg.role === 'assistant' ? (
-                      <ChatFormattedResponse content={msg.content} />
-                    ) : (
-                      msg.content
-                    )
-                  }</div>
+                <div
+                  key={idx}
+                  className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}
+                  style={{ animationDelay: `${idx * 0.05}s` }}
+                >
+                  <div className={`max-w-[80%] flex items-end gap-2 ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
+                    {/* Avatar */}
+                    <div className="flex-shrink-0">
+                      {msg.role === 'user' ? (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-500 flex items-center justify-center text-white font-bold shadow-md">
+                          <span>🧑</span>
+                        </div>
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-cyan-500 flex items-center justify-center text-white font-bold shadow-md">
+                          <span>🤖</span>
+                        </div>
+                      )}
+                    </div>
+                    {/* Chat Bubble */}
+                    <div
+                      className={`rounded-2xl px-4 py-2 shadow-md text-base whitespace-pre-line font-sans transition-all duration-500
+                        ${msg.role === 'user'
+                          ? 'bg-gradient-to-br from-green-50 to-emerald-100 text-green-900 border border-green-200 animate-slide-in-right'
+                          : 'bg-gradient-to-br from-blue-50 to-cyan-100 text-blue-900 border border-blue-200 animate-slide-in-left'}
+                      `}
+                      style={{
+                        fontFamily: 'inherit',
+                        wordBreak: 'break-word',
+                        lineHeight: '1.6',
+                      }}
+                    >
+                      {msg.role === 'model' ? (
+                        <ChatFormattedResponse content={msg.content} />
+                      ) : (
+                        msg.content
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
               {loading && (

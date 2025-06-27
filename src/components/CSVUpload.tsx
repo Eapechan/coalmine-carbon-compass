@@ -81,20 +81,32 @@ const CSVUpload = () => {
     'liter': 'litres',
     'litres': 'litres',
     'litre': 'litres',
+    'l': 'litres',
     'kg': 'kg',
     'kilogram': 'kg',
     'kilograms': 'kg',
+    'kgs': 'kg',
     'ton': 'tonnes',
     'tons': 'tonnes',
     'tonnes': 'tonnes',
     'tonne': 'tonnes',
+    't': 'tonnes',
     'kwh': 'kWh',
     'kw-h': 'kWh',
+    'kilowatt-hour': 'kWh',
+    'kilowatt-hours': 'kWh',
     'hours': 'hour',
     'hour': 'hour',
+    'hr': 'hour',
+    'hrs': 'hour',
     'km': 'km',
     'kilometer': 'km',
     'kilometers': 'km',
+    'kilometre': 'km',
+    'kilometres': 'km',
+    'miles': 'km',
+    'mile': 'km',
+    'mi': 'km',
   };
 
   function normalizeActivityType(input: string): string {
@@ -163,27 +175,45 @@ const CSVUpload = () => {
       }
     }
 
-    // Flexible unit match and auto-convert for coal
+    // Flexible unit match and auto-convert
     let unit = row.unit;
     if (activity) {
       const expectedUnit = activity.unit;
       let matchedUnit = findUnitMatch(row.unit, expectedUnit);
-      // Special case: coal, expected kg, input tons/tonnes/ton
-      if (
-        activity.value === 'coal' &&
-        normalizeUnit(row.unit) !== 'kg' &&
-        ['ton', 'tons', 'tonnes'].includes(row.unit.trim().toLowerCase())
-      ) {
-        // Convert to kg
-        quantity = quantity * 1000;
-        unit = 'kg';
-        matchedUnit = 'kg';
+      
+      // Handle unit conversions
+      if (activity.value === 'coal') {
+        // Coal: convert tons/tonnes to kg
+        if (['ton', 'tons', 'tonnes', 'tonne'].includes(normalizeUnit(row.unit))) {
+          quantity = quantity * 1000;
+          unit = 'kg';
+          matchedUnit = 'kg';
+        }
+      } else if (activity.value === 'electricity' || activity.value === 'solar' || activity.value === 'wind') {
+        // Electricity: accept kWh, kwh, kw-h
+        if (['kwh', 'kw-h', 'kilowatt-hour', 'kilowatt-hours'].includes(normalizeUnit(row.unit))) {
+          unit = 'kWh';
+          matchedUnit = 'kWh';
+        }
+      } else if (activity.value === 'transport_diesel' || activity.value === 'transport_petrol' || activity.value === 'transport_electric') {
+        // Transport: accept km, kilometer, kilometers
+        if (['km', 'kilometer', 'kilometers'].includes(normalizeUnit(row.unit))) {
+          unit = 'km';
+          matchedUnit = 'km';
+        }
+      } else if (activity.value === 'excavator_diesel' || activity.value === 'bulldozer_diesel' || activity.value === 'haul_truck_diesel') {
+        // Equipment: accept hour, hours
+        if (['hour', 'hours'].includes(normalizeUnit(row.unit))) {
+          unit = 'hour';
+          matchedUnit = 'hour';
+        }
       }
+      
       if (!row.unit || !matchedUnit) {
         // Auto-fill if missing or wrong
         unit = expectedUnit;
         if (row.unit && !matchedUnit) {
-          errors.push(`Unit '${row.unit}' does not match expected unit '${expectedUnit}' for activity '${activity.label}'`);
+          errors.push(`Unit '${row.unit}' does not match expected unit '${expectedUnit}' for activity '${activity.label}'. Auto-corrected to '${expectedUnit}'.`);
         }
       } else {
         unit = expectedUnit;
@@ -194,8 +224,15 @@ const CSVUpload = () => {
     if (activity && quantity > 0 && errors.length === 0) {
       try {
         co2e = calculateCO2Emission(activity.value, quantity);
+        // Ensure the result is a valid number
+        if (isNaN(co2e) || co2e < 0) {
+          errors.push("Invalid CO2 calculation result");
+          co2e = 0;
+        }
       } catch (error) {
+        console.error('CO2 calculation error:', error);
         errors.push("Failed to calculate CO2 equivalent");
+        co2e = 0;
       }
     }
 

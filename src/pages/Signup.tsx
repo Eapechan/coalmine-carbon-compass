@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -21,12 +20,36 @@ const Signup = () => {
     phone: "",
     agreeToTerms: false
   });
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Signup attempt:", formData);
-    // Simulate signup success
-    navigate("/");
+    setError("");
+    
+    if (!formData.email || !formData.password || !formData.confirmPassword || !formData.role) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
+
+    if (!formData.agreeToTerms) {
+      setError("Please agree to the Terms of Service");
+      return;
+    }
+
+    try {
+      // Simulate signup process
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // For demo purposes, always succeed
+      navigate("/");
+    } catch (err) {
+      setError("An error occurred during signup. Please try again.");
+    }
   };
 
   return (

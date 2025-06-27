@@ -4,9 +4,8 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
-import { LogOut, User, Settings, Bell, Sun, Moon } from "lucide-react";
+import { LogOut, User, Settings, Bell } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useState } from "react";
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -15,7 +14,6 @@ interface LayoutProps {
 const Layout = ({ children }: LayoutProps) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [darkMode, setDarkMode] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -82,24 +80,6 @@ const Layout = ({ children }: LayoutProps) => {
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse-green"></div>
               <span className="text-sm text-green-700 font-medium">System Online</span>
             </div>
-
-            {/* Notifications */}
-            <Button variant="ghost" size="sm" className="relative hover:bg-green-50">
-              <Bell className="h-4 w-4" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
-                3
-              </span>
-            </Button>
-
-            {/* Theme Toggle */}
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              onClick={() => setDarkMode(!darkMode)}
-              className="hover:bg-green-50"
-            >
-              {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-            </Button>
 
             {/* Welcome Message */}
             <div className="text-sm text-gray-600 hidden lg:block">

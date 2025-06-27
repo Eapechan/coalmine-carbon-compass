@@ -84,24 +84,36 @@ const CarbonSink = () => {
         const duration = parseFloat(projectDuration);
         const vegetation = VEGETATION_TYPES.find(v => v.value === vegetationType);
         
-        if (vegetation) {
+        if (vegetation && area > 0 && duration > 0) {
           // Convert area to hectares if needed
           let areaInHectares = area;
           if (areaUnit === "acres") {
             areaInHectares = area * 0.404686;
           } else if (areaUnit === "sqkm") {
             areaInHectares = area * 100;
+          } else if (areaUnit === "sqm") {
+            areaInHectares = area / 10000;
           }
           
+          // Calculate annual sequestration (tonnes CO2e per hectare per year)
           const annualSequestration = areaInHectares * vegetation.rate;
+          
+          // Calculate total sequestration over project duration
           const totalSequestration = annualSequestration * duration;
           
-          setAdvancedCalculatedCO2(totalSequestration);
+          // Convert to kg CO2e for consistency with other calculations
+          const totalSequestrationKg = totalSequestration * 1000;
+          
+          setAdvancedCalculatedCO2(totalSequestrationKg);
+        } else {
+          setAdvancedCalculatedCO2(0);
         }
       } catch (error) {
-        setAdvancedCalculatedCO2(0);
         console.error('Advanced calculation error:', error);
+        setAdvancedCalculatedCO2(0);
       }
+    } else {
+      setAdvancedCalculatedCO2(0);
     }
   };
 
@@ -126,60 +138,28 @@ const CarbonSink = () => {
 
   const handleMapClick = () => {
     setShowMap(!showMap);
-    if (!showMap) {
-      // Simulate getting coordinates (in real app, this would integrate with Google Maps API)
-      setMapCoordinates({ lat: "23.5937", lng: "78.9629" }); // Default to India center
-    }
+    // Do not set default coordinates here. Only toggle the map visibility.
   };
 
+  // Improved Google Maps link parser
   const parseGoogleMapsLink = (link: string) => {
     try {
-      // Handle different Google Maps URL formats
       let coordinates = null;
-      
-      // Format 1: https://www.google.com/maps/place/.../@lat,lng,zoom
-      const placeMatch = link.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (placeMatch) {
-        coordinates = { lat: placeMatch[1], lng: placeMatch[2] };
+      // Try to extract from common URL patterns
+      const patterns = [
+        /@(-?\d+\.\d+),(-?\d+\.\d+)/, // @lat,lng
+        /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/, // ?q=lat,lng
+        /[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/, // ?ll=lat,lng
+        /\/place\/(-?\d+\.\d+),(-?\d+\.\d+)/, // /place/lat,lng
+        /^(-?\d+\.\d+),(-?\d+\.\d+)$/ // direct lat,lng
+      ];
+      for (const pattern of patterns) {
+        const match = link.match(pattern);
+        if (match) {
+          coordinates = { lat: parseFloat(match[1]).toFixed(6), lng: parseFloat(match[2]).toFixed(6) };
+          break;
+        }
       }
-      
-      // Format 2: https://www.google.com/maps?q=lat,lng
-      const queryMatch = link.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (queryMatch) {
-        coordinates = { lat: queryMatch[1], lng: queryMatch[2] };
-      }
-      
-      // Format 3: https://maps.google.com/?ll=lat,lng
-      const llMatch = link.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (llMatch) {
-        coordinates = { lat: llMatch[1], lng: llMatch[2] };
-      }
-      
-      // Format 4: https://www.google.com/maps/dir/.../@lat,lng
-      const dirMatch = link.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (dirMatch) {
-        coordinates = { lat: dirMatch[1], lng: dirMatch[2] };
-      }
-      
-      // Format 5: Shortened URLs (maps.app.goo.gl) - these need to be expanded first
-      if (link.includes('maps.app.goo.gl') || link.includes('goo.gl/maps')) {
-        // For shortened URLs, we'll need to handle them differently
-        // For now, we'll show a message to the user
-        return { error: "shortened_url" };
-      }
-      
-      // Format 6: https://www.google.com/maps?q=place+name+lat,lng
-      const placeQueryMatch = link.match(/[?&]q=[^&]*?(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (placeQueryMatch) {
-        coordinates = { lat: placeQueryMatch[1], lng: placeQueryMatch[2] };
-      }
-      
-      // Format 7: https://maps.google.com/maps?q=lat,lng
-      const mapsQueryMatch = link.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
-      if (mapsQueryMatch) {
-        coordinates = { lat: mapsQueryMatch[1], lng: mapsQueryMatch[2] };
-      }
-      
       return coordinates;
     } catch (error) {
       console.error('Error parsing Google Maps link:', error);
@@ -187,61 +167,56 @@ const CarbonSink = () => {
     }
   };
 
+  // Update handleMapsLinkPaste to use lat/lng from backend if available, as part of the advanced extraction logic
   const handleMapsLinkPaste = async (link: string) => {
     setMapsLink(link);
-
-    // If it's a shortened URL, expand it via backend
-    if (link.includes('maps.app.goo.gl') || link.includes('goo.gl/maps')) {
+    let coords = parseGoogleMapsLink(link);
+    if (!coords && (link.includes('maps.app.goo.gl') || link.includes('goo.gl/maps'))) {
       try {
         const res = await fetch(`http://localhost:3001/expand?url=${encodeURIComponent(link)}`);
         const data = await res.json();
-        if (data.expanded) {
-          // Now parse the expanded URL for coordinates
-          const coords = parseGoogleMapsLink(data.expanded);
-          if (coords && coords.lat && coords.lng) {
-            setMapCoordinates(coords);
-            toast({
-              title: "Location Detected",
-              description: `Coordinates extracted: ${coords.lat}, ${coords.lng}`,
-            });
-          } else {
-            toast({
-              title: "Invalid Expanded Link",
-              description: "Could not extract coordinates from the expanded link.",
-              variant: "destructive"
-            });
-          }
-        } else {
-          toast({
-            title: "Expansion Failed",
-            description: data.error || "Could not expand the shortened URL.",
-            variant: "destructive"
-          });
+        if (data.lat && data.lng) {
+          coords = { lat: parseFloat(data.lat).toFixed(6), lng: parseFloat(data.lng).toFixed(6) };
+        } else if (data.expanded) {
+          coords = parseGoogleMapsLink(data.expanded);
         }
       } catch (err) {
-        toast({
-          title: "Expansion Error",
-          description: "Failed to expand the shortened URL.",
-          variant: "destructive"
-        });
+        // Ignore backend errors, fallback to manual
       }
-      return;
     }
-
-    // ...existing logic for full URLs...
-    const result = parseGoogleMapsLink(link);
-    if (result && result.lat && result.lng) {
-      setMapCoordinates(result);
+    if (coords && coords.lat && coords.lng) {
+      setMapCoordinates(coords);
       toast({
         title: "Location Detected",
-        description: `Coordinates extracted: ${result.lat}, ${result.lng}`,
+        description: `Coordinates extracted: ${coords.lat}, ${coords.lng}`,
       });
     } else {
       toast({
-        title: "Invalid Link",
-        description: "Please paste a valid Google Maps link with coordinates. Try right-clicking on the location in Google Maps and selecting 'Share' → 'Copy link'.",
+        title: "Could Not Extract Coordinates",
+        description: "Please use a Google Maps URL with coordinates or enter them manually.",
         variant: "destructive"
       });
+    }
+  };
+
+  // Helper to paste coordinates string
+  const handlePasteCoordinates = () => {
+    const input = prompt("Paste coordinates as 'lat,lng' (e.g., 23.5937,78.9629):");
+    if (input) {
+      const match = input.match(/^\s*(-?\d+\.\d+)\s*,\s*(-?\d+\.\d+)\s*$/);
+      if (match) {
+        setMapCoordinates({ lat: match[1], lng: match[2] });
+        toast({
+          title: "Coordinates Pasted",
+          description: `Latitude: ${match[1]}, Longitude: ${match[2]}`,
+        });
+      } else {
+        toast({
+          title: "Invalid Format",
+          description: "Please paste coordinates in the format: lat,lng (e.g., 23.5937,78.9629)",
+          variant: "destructive"
+        });
+      }
     }
   };
 
@@ -360,6 +335,44 @@ const CarbonSink = () => {
   };
 
   const totalCarbonSinks = getTotalCarbonSinks();
+
+  // Add coordinate validation
+  const validateCoordinates = (lat: string, lng: string): boolean => {
+    const latNum = parseFloat(lat);
+    const lngNum = parseFloat(lng);
+    return !isNaN(latNum) && !isNaN(lngNum) && 
+           latNum >= -90 && latNum <= 90 && 
+           lngNum >= -180 && lngNum <= 180;
+  };
+
+  // Calculate annual sequestration for display
+  const getAnnualSequestration = () => {
+    if (landArea && vegetationType && projectDuration) {
+      try {
+        const area = parseFloat(landArea);
+        const duration = parseFloat(projectDuration);
+        const vegetation = VEGETATION_TYPES.find(v => v.value === vegetationType);
+        
+        if (vegetation && area > 0 && duration > 0) {
+          let areaInHectares = area;
+          if (areaUnit === "acres") {
+            areaInHectares = area * 0.404686;
+          } else if (areaUnit === "sqkm") {
+            areaInHectares = area * 100;
+          } else if (areaUnit === "sqm") {
+            areaInHectares = area / 10000;
+          }
+          
+          return areaInHectares * vegetation.rate;
+        }
+      } catch (error) {
+        console.error('Annual calculation error:', error);
+      }
+    }
+    return 0;
+  };
+
+  const annualSequestration = getAnnualSequestration();
 
   return (
     <div className="space-y-6">
@@ -644,6 +657,7 @@ const CarbonSink = () => {
                         <SelectItem value="hectares">Hectares</SelectItem>
                         <SelectItem value="acres">Acres</SelectItem>
                         <SelectItem value="sqkm">Square Kilometers</SelectItem>
+                        <SelectItem value="sqm">Square Meters</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -696,9 +710,29 @@ const CarbonSink = () => {
                     </Button>
                   </div>
 
+                  {/* Manual Coordinate Input */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Latitude</Label>
+                      <Input
+                        placeholder="e.g., 23.5937"
+                        value={mapCoordinates.lat}
+                        onChange={(e) => setMapCoordinates(prev => ({ ...prev, lat: e.target.value }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Longitude</Label>
+                      <Input
+                        placeholder="e.g., 78.9629"
+                        value={mapCoordinates.lng}
+                        onChange={(e) => setMapCoordinates(prev => ({ ...prev, lng: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+
                   {/* Google Maps Link Input */}
                   <div className="space-y-2">
-                    <Label>Paste Google Maps Link</Label>
+                    <Label>Paste Google Maps Link (Optional)</Label>
                     <div className="flex gap-2">
                       <Input
                         placeholder="Paste Google Maps URL here..."
@@ -720,35 +754,23 @@ const CarbonSink = () => {
                       >
                         Extract
                       </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={handlePasteCoordinates}
+                      >
+                        Paste Coordinates
+                      </Button>
                     </div>
                     <p className="text-xs text-gray-500">
-                      Supports Google Maps place, directions, and coordinate links. Auto-detects when you paste a link!
-                      <br />
-                      <strong>Tip:</strong> Right-click on a location in Google Maps → "Share" → "Copy link" for the best results.
+                      <strong>Tip:</strong> For best results, right-click on your location in Google Maps, select "What's here?", click the coordinates, and copy the URL from your browser's address bar.<br />
+                      <strong>Alternative:</strong> You can also manually enter coordinates above, or use the "Paste Coordinates" button.<br />
+                      <strong>Note:</strong> Google Maps short links and place-name links may not contain coordinates and are not always reliable for automated extraction.
                     </p>
                   </div>
                   
                   {showMap && (
                     <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>Latitude</Label>
-                          <Input
-                            placeholder="e.g., 23.5937"
-                            value={mapCoordinates.lat}
-                            onChange={(e) => setMapCoordinates(prev => ({ ...prev, lat: e.target.value }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Longitude</Label>
-                          <Input
-                            placeholder="e.g., 78.9629"
-                            value={mapCoordinates.lng}
-                            onChange={(e) => setMapCoordinates(prev => ({ ...prev, lng: e.target.value }))}
-                          />
-                        </div>
-                      </div>
-
                       {/* Google Maps Preview */}
                       {mapCoordinates.lat && mapCoordinates.lng && (
                         <div className="rounded-lg overflow-hidden border mt-2">
@@ -765,13 +787,15 @@ const CarbonSink = () => {
                       )}
 
                       {/* Placeholder for Google Maps integration */}
-                      <div className="h-48 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
-                        <div className="text-center">
-                          <Globe className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-500">Google Maps Integration</p>
-                          <p className="text-xs text-gray-400">Click to set coordinates</p>
+                      {(!mapCoordinates.lat || !mapCoordinates.lng) && (
+                        <div className="h-48 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
+                          <div className="text-center">
+                            <Globe className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                            <p className="text-sm text-gray-500">Google Maps Integration</p>
+                            <p className="text-xs text-gray-400">Enter coordinates above or paste a Google Maps link</p>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -810,26 +834,95 @@ const CarbonSink = () => {
                 {/* Calculated Results */}
                 {advancedCalculatedCO2 > 0 && (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <h3 className="font-semibold text-green-800">Carbon Offset Potential</h3>
+                      
+                      {/* Area Information */}
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-gray-600">Annual Sequestration:</span>
+                          <span className="text-gray-600">Land Area:</span>
                           <div className="font-medium text-green-600">
-                            {formatCO2Value(advancedCalculatedCO2 / parseFloat(projectDuration))}
+                            {landArea} {areaUnit}
                           </div>
                         </div>
                         <div>
-                          <span className="text-gray-600">Total Project:</span>
+                          <span className="text-gray-600">Area in Hectares:</span>
                           <div className="font-medium text-green-600">
-                            {formatCO2Value(advancedCalculatedCO2)}
+                            {(() => {
+                              const area = parseFloat(landArea);
+                              if (areaUnit === "acres") return (area * 0.404686).toFixed(2);
+                              if (areaUnit === "sqkm") return (area * 100).toFixed(2);
+                              if (areaUnit === "sqm") return (area / 10000).toFixed(2);
+                              return area.toFixed(2);
+                            })()} ha
                           </div>
                         </div>
                       </div>
-                      <p className="text-xs text-green-600">
-                        Based on {vegetationType && VEGETATION_TYPES.find(v => v.value === vegetationType)?.label} 
-                        at {landArea} {areaUnit} over {projectDuration} years
-                      </p>
+
+                      {/* Vegetation Information */}
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Vegetation Type:</span>
+                          <div className="font-medium text-green-600">
+                            {vegetationType && VEGETATION_TYPES.find(v => v.value === vegetationType)?.label}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Sequestration Rate:</span>
+                          <div className="font-medium text-green-600">
+                            {vegetationType && VEGETATION_TYPES.find(v => v.value === vegetationType)?.rate} t CO₂e/ha/yr
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Project Duration */}
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <span className="text-gray-600">Project Duration:</span>
+                          <div className="font-medium text-green-600">
+                            {projectDuration} years
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Annual Sequestration:</span>
+                          <div className="font-medium text-green-600">
+                            {formatCO2Value(annualSequestration * 1000)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Total Project Results */}
+                      <div className="border-t pt-3">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <span className="text-gray-600">Total Project:</span>
+                            <div className="font-medium text-green-600 text-lg">
+                              {formatCO2Value(advancedCalculatedCO2)}
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-gray-600">Average Annual:</span>
+                            <div className="font-medium text-green-600">
+                              {formatCO2Value(advancedCalculatedCO2 / parseFloat(projectDuration))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Location Information */}
+                      {mapCoordinates.lat && mapCoordinates.lng && (
+                        <div className="border-t pt-3">
+                          <div className="text-sm">
+                            <span className="text-gray-600">Location:</span>
+                            <div className="font-medium text-green-600">
+                              {mapCoordinates.lat}, {mapCoordinates.lng}
+                              {validateCoordinates(mapCoordinates.lat, mapCoordinates.lng) && (
+                                <span className="text-xs text-green-500 ml-2">✓ Valid coordinates</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}

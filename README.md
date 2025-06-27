@@ -1,43 +1,34 @@
-# CoalMine Carbon Compass 🌱
+# CoalMineNetZero - Carbon Management Platform
 
-A comprehensive carbon neutrality platform designed specifically for Indian coal mines to track, manage, and reduce their carbon footprint while working towards India's Net Zero Mission 2070.
+A comprehensive carbon management platform for coal mining operations, featuring AI-powered insights and real-time monitoring.
 
-## 🚀 Features
+## 🌟 Key Features
 
-### 🔐 Authentication System
-- **Multi-role Support**: Mine Operators, Regulators, and Administrators
-- **Secure Login**: Role-based access control
-- **Session Management**: Persistent login with localStorage
+### 🤖 AI-Powered Insights
+- **Gemini AI Integration**: Advanced AI analysis powered by Google's Gemini Pro
+- **Smart Recommendations**: Personalized carbon reduction strategies
+- **Emission Analysis**: AI-driven pattern recognition and optimization suggestions
+- **Compliance Reports**: Automated regulatory compliance assessment
+- **Chat Assistant**: Interactive AI assistant for carbon management guidance
 
-### 📊 Real-time Dashboard
-- **Live Statistics**: Total emissions, carbon offsets, reduction percentages
-- **Interactive Charts**: Pie charts, line charts, and progress indicators
-- **Carbon Neutrality Progress**: Visual progress towards net-zero goals
-- **Sustainability Score**: Dynamic scoring based on performance
+### 📊 Dashboard & Analytics
+- **Real-time Monitoring**: Live emission tracking and carbon sink monitoring
+- **Interactive Charts**: Visual representation of emission trends and patterns
+- **Progress Tracking**: Carbon neutrality progress with animated indicators
+- **Performance Metrics**: Sustainability scoring and reduction percentages
 
-### 📝 Emission Management
-- **IPCC Standards**: Real CO₂ calculations using IPCC emission factors
-- **Multiple Sources**: Diesel, electricity, transport, equipment, refrigerants
-- **Automatic Calculations**: Real-time CO₂ equivalent calculations
-- **Data Export**: CSV export functionality
-- **Bulk Upload**: Advanced CSV import with validation and preview
-  - **Drag & Drop**: Intuitive file upload interface
-  - **Template Download**: Pre-formatted CSV template
-  - **Real-time Validation**: Instant error checking and feedback
-  - **Preview Mode**: Review data before import
-  - **Progress Tracking**: Visual import progress with status updates
-  - **Error Handling**: Detailed error reporting for invalid entries
+### 🔔 Smart Notifications
+- **Success Alerts**: Achievement notifications for emission reductions
+- **Warning System**: Excess emission alerts and compliance reminders
+- **Priority Management**: High, medium, and low priority notifications
+- **Action Items**: Direct action buttons for quick response
+- **Filtering**: Filter by unread, priority, or all notifications
 
-### 🌿 Carbon Sink Tracking
-- **Offset Projects**: Tree plantations, solar installations, energy efficiency
-- **Real Calculations**: Based on scientific sequestration factors
-- **Project Management**: Track location, description, and progress
-- **Advanced Calculator**: Estimate potential offsets for new projects
-
-### 📈 Strategy Management
-- **Reduction Strategies**: Plan and track carbon reduction initiatives
-- **Progress Monitoring**: Real-time updates on strategy implementation
+### 📋 Strategy Management
+- **AI Recommendations**: Gemini AI-powered strategy suggestions
+- **Implementation Planning**: Phase-wise strategy execution
 - **ROI Analysis**: Cost-benefit analysis of sustainability projects
+- **Progress Monitoring**: Real-time updates on strategy implementation
 - **Status Tracking**: Planned, in-progress, and completed projects
 
 ### 📋 Reports & Analytics
@@ -55,12 +46,14 @@ A comprehensive carbon neutrality platform designed specifically for Indian coal
 - **Routing**: React Router DOM
 - **Forms**: React Hook Form + Zod validation
 - **Build Tool**: Vite
+- **AI Integration**: Google Gemini Pro API
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 - Node.js 18+ 
 - npm or yarn
+- Gemini AI API key (optional, for AI features)
 
 ### Installation
 
@@ -75,12 +68,18 @@ A comprehensive carbon neutrality platform designed specifically for Indian coal
    npm install
    ```
 
-3. **Start the development server**
+3. **Configure Gemini AI (Optional)**
+   Create a `.env` file in the root directory:
+   ```env
+   VITE_GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+
+4. **Start the development server**
    ```bash
    npm run dev
    ```
 
-4. **Open your browser**
+5. **Open your browser**
    Navigate to `http://localhost:5173`
 
 ### Demo Credentials
@@ -92,6 +91,22 @@ Use these credentials to test the application:
 | Mine Operator | `operator@coalmine.gov.in` | `password123` |
 | Regulator | `regulator@cpcb.gov.in` | `password123` |
 | Admin | `admin@coalmine.gov.in` | `password123` |
+
+## 🤖 AI Features
+
+### Gemini AI Integration
+The platform integrates Google's Gemini Pro AI for:
+- **Strategy Recommendations**: AI-powered carbon reduction strategies
+- **Emission Analysis**: Pattern recognition and optimization suggestions
+- **Compliance Reports**: Automated regulatory compliance assessment
+- **Chat Assistant**: Interactive AI guidance for carbon management
+
+### AI Capabilities
+- Real-time data analysis
+- Predictive modeling for emission trends
+- Personalized recommendations based on mine data
+- Natural language interaction for complex queries
+- Multi-language support for Indian mining operations
 
 ## 📊 Data Management
 
@@ -107,107 +122,60 @@ All calculations are based on:
 - **IPCC 2006 Guidelines**: Emission factors
 - **CEA 2023**: Indian grid electricity mix
 - **ARAI 2023**: Transport emission factors
-- **Forest Research Institute India**: Carbon sequestration rates
 
-### CSV Upload Format
-The bulk upload feature supports CSV files with the following format:
+## 🔔 Notification System
 
-```csv
-Date,Activity Type,Quantity,Unit,Location,Notes
-2024-01-15,Diesel Fuel,5000,litres,Block A,Heavy equipment operation
-2024-01-14,Electricity,8500,kWh,Processing Plant,Daily operations
-```
+### Types of Notifications
+- **Success**: Achievement alerts for emission reductions and milestones
+- **Warning**: Excess emission alerts and compliance issues
+- **Error**: High-risk situations requiring immediate attention
+- **Info**: Recommendations and insights
+- **Reminder**: Data entry reminders and report deadlines
 
-**Required Fields:**
-- **Date**: YYYY-MM-DD format
-- **Activity Type**: Must match available emission sources
-- **Quantity**: Positive number
-- **Unit**: Measurement unit (auto-filled based on activity type)
+### Features
+- Priority-based sorting (High > Medium > Low)
+- Read/unread status tracking
+- Action buttons for quick response
+- Filtering and search capabilities
+- Automatic generation based on data patterns
 
-**Optional Fields:**
-- **Location**: Mine section or location
-- **Notes**: Additional context or details
+## 🎯 Key Benefits
 
-**Supported Activity Types:**
-- Diesel Fuel (litres)
-- Electricity (kWh)
-- Vehicle Transport (km)
-- Coal Combustion (tonnes)
-- Refrigerants (kg)
-- Equipment Operation (hours)
+- **AI-Powered Insights**: Leverage advanced AI for strategic decision-making
+- **Real-time Monitoring**: Track emissions and progress in real-time
+- **Regulatory Compliance**: Automated compliance reporting and alerts
+- **Cost Optimization**: AI-driven recommendations for maximum ROI
+- **Sustainability Goals**: Clear path to carbon neutrality
+- **User-Friendly Interface**: Intuitive design for all user types
 
-## 🏗️ Project Structure
+## 📈 Future Enhancements
 
-```
-src/
-├── components/          # Reusable UI components
-│   ├── ui/             # Shadcn/ui components
-│   ├── Layout.tsx      # Main layout wrapper
-│   ├── AppSidebar.tsx  # Navigation sidebar
-│   └── CSVUpload.tsx   # Bulk upload component
-├── contexts/           # React contexts
-│   ├── AuthContext.tsx # Authentication state
-│   └── DataContext.tsx # Application data
-├── hooks/              # Custom React hooks
-├── lib/                # Utility functions
-│   ├── calculations.ts # CO₂ calculation logic
-│   └── utils.ts        # General utilities
-├── pages/              # Application pages
-│   ├── Dashboard.tsx   # Main dashboard
-│   ├── EmissionInput.tsx # Emission logging
-│   ├── CarbonSink.tsx  # Carbon sink management
-│   ├── Strategy.tsx    # Strategy planning
-│   ├── Reports.tsx     # Reports and analytics
-│   ├── Login.tsx       # Authentication
-│   └── ...            # Other pages
-└── App.tsx            # Main application component
-```
-
-## 🔧 Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
-
-## 🌍 Environmental Impact
-
-This platform helps coal mines:
-- **Track Emissions**: Accurate CO₂ footprint measurement
-- **Plan Reductions**: Strategic carbon reduction planning
-- **Achieve Compliance**: Meet regulatory requirements
-- **Support Net Zero**: Contribute to India's 2070 goal
+- **Advanced AI Models**: Integration with additional AI providers
+- **Mobile Application**: Native mobile app for field operations
+- **IoT Integration**: Real-time sensor data integration
+- **Blockchain**: Carbon credit verification and trading
+- **Multi-language Support**: Additional Indian languages
+- **Advanced Analytics**: Machine learning for predictive insights
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## 🆘 Support
 
 For support and questions:
-- Create an issue in the repository
-- Contact the development team
-- Check the documentation
-
-## 🔮 Future Enhancements
-
-- **Real-time Monitoring**: IoT sensor integration
-- **AI Recommendations**: Machine learning for optimization
-- **Mobile App**: React Native mobile application
-- **API Integration**: Backend server with database
-- **Advanced Analytics**: Predictive modeling and forecasting
-- **GIS Integration**: Geographic information system mapping
-- **Advanced CSV Features**: Excel import, data mapping, batch processing
+- Email: support@coalmine.gov.in
+- Documentation: [Link to docs]
+- Issues: [GitHub Issues]
 
 ---
 
-**🇮🇳 Supporting India's Net Zero Mission 2070**  
-*Empowering Coal Mines for Carbon Neutrality*
+**Built with ❤️ for sustainable mining operations**
