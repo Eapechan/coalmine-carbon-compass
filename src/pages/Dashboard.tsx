@@ -1,19 +1,15 @@
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar, Sector } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, BarChart, Bar } from "recharts";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatCO2Value, calculateReductionPercentage, calculateNetEmissions, formatCO2Tonnes } from "@/lib/calculations";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
-import { useState } from "react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { TrendingUp, TrendingDown, Minus, Leaf, Factory, Target, Award } from "lucide-react";
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -27,6 +23,13 @@ const Dashboard = () => {
     getReductionPercentage 
   } = useData();
 
+  const [animatedValues, setAnimatedValues] = useState({
+    totalEmissions: 0,
+    totalCarbonSinks: 0,
+    reductionPercentage: 0,
+    sustainabilityScore: 0
+  });
+
   // Calculate real statistics
   const totalEmissions = getTotalEmissions();
   const totalCarbonSinks = getTotalCarbonSinks();
@@ -39,36 +42,81 @@ const Dashboard = () => {
     (strategies.filter(s => s.status === 'completed').length * 2)
   ));
 
+  // Animate numbers on mount
+  useEffect(() => {
+    const duration = 2000;
+    const steps = 60;
+    const stepDuration = duration / steps;
+
+    let currentStep = 0;
+    const timer = setInterval(() => {
+      currentStep++;
+      const progress = currentStep / steps;
+      const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+
+      setAnimatedValues({
+        totalEmissions: totalEmissions * easeOutQuart,
+        totalCarbonSinks: totalCarbonSinks * easeOutQuart,
+        reductionPercentage: reductionPercentage * easeOutQuart,
+        sustainabilityScore: sustainabilityScore * easeOutQuart
+      });
+
+      if (currentStep >= steps) {
+        clearInterval(timer);
+        setAnimatedValues({
+          totalEmissions,
+          totalCarbonSinks,
+          reductionPercentage,
+          sustainabilityScore
+        });
+      }
+    }, stepDuration);
+
+    return () => clearInterval(timer);
+  }, [totalEmissions, totalCarbonSinks, reductionPercentage, sustainabilityScore]);
+
   const statsData = [
     {
       title: "Total CO₂ Emissions",
-      value: formatCO2Tonnes(totalEmissions),
+      value: formatCO2Tonnes(animatedValues.totalEmissions),
       change: totalEmissions > 0 ? "+" + (totalEmissions * 0.05).toFixed(1) + "%" : "0%",
       trend: "up" as const,
-      icon: "📊"
+      icon: Factory,
+      color: "from-red-500 to-orange-500",
+      bgColor: "bg-red-50",
+      textColor: "text-red-700"
     },
     {
       title: "Carbon Offsets",
-      value: formatCO2Tonnes(totalCarbonSinks),
+      value: formatCO2Tonnes(animatedValues.totalCarbonSinks),
       change: totalCarbonSinks > 0 ? "+" + (totalCarbonSinks * 0.15).toFixed(1) + "%" : "0%",
       trend: "up" as const,
-      icon: "🌱"
+      icon: Leaf,
+      color: "from-green-500 to-emerald-500",
+      bgColor: "bg-green-50",
+      textColor: "text-green-700"
     },
     {
       title: "Reduction Achieved",
-      value: reductionPercentage.toFixed(1),
+      value: animatedValues.reductionPercentage.toFixed(1),
       unit: "%",
       change: reductionPercentage > 0 ? "+" + (reductionPercentage * 0.1).toFixed(1) + "%" : "0%",
       trend: "up" as const,
-      icon: "📉"
+      icon: Target,
+      color: "from-blue-500 to-cyan-500",
+      bgColor: "bg-blue-50",
+      textColor: "text-blue-700"
     },
     {
       title: "Sustainability Score",
-      value: sustainabilityScore.toFixed(1),
+      value: animatedValues.sustainabilityScore.toFixed(1),
       unit: "/10",
       change: sustainabilityScore > 0 ? "+" + (sustainabilityScore * 0.05).toFixed(1) : "0",
       trend: "up" as const,
-      icon: "🏆"
+      icon: Award,
+      color: "from-purple-500 to-pink-500",
+      bgColor: "bg-purple-50",
+      textColor: "text-purple-700"
     }
   ];
 
@@ -86,7 +134,7 @@ const Dashboard = () => {
   const pieChartData = Object.entries(emissionsByActivity).map(([name, value], index) => ({
     name,
     value,
-    color: ['#dc2626', '#ea580c', '#ca8a04', '#16a34a', '#0891b2', '#7c3aed'][index % 6]
+    color: ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6'][index % 6]
   }));
 
   // Prepare time series data for line chart
@@ -104,199 +152,61 @@ const Dashboard = () => {
     new Date(a.month + ' 1, 2024').getTime() - new Date(b.month + ' 1, 2024').getTime()
   );
 
-  // Strategy progress data
-  const strategyProgress = strategies.map(strategy => ({
-    category: strategy.category,
-    savings: strategy.currentReduction,
-    roi: strategy.roi,
-    status: strategy.status
-  }));
-
-  // Net Carbon Balance calculation
-  const netCarbonBalance = totalEmissions - totalCarbonSinks;
-  const netBalanceColor = netCarbonBalance > 0 ? 'text-red-600' : 'text-green-600';
-  const netBalanceLabel = netCarbonBalance > 0 ? 'Surplus' : 'Deficit';
-
-  // Carbon Credit calculation
-  const carbonCredit = Math.max(0, totalCarbonSinks - totalEmissions);
-  const carbonCreditColor = carbonCredit > 0 ? 'text-green-600' : 'text-gray-500';
-  const carbonCreditIcon = carbonCredit > 0 ? '🏅' : '⏸️';
-
-  // Custom label renderer for pie chart
-  const renderPieLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent, name }) => {
-    if (percent < 0.02) return null; // skip labels for <2%
-    const RADIAN = Math.PI / 180;
-    const radius = outerRadius + 24;
-    const x = cx + radius * Math.cos(-midAngle * RADIAN);
-    const y = cy + radius * Math.sin(-midAngle * RADIAN);
-    return (
-      <text
-        x={x}
-        y={y}
-        fill="#222"
-        textAnchor={x > cx ? "start" : "end"}
-        dominantBaseline="central"
-        fontSize={14}
-        fontWeight={500}
-        style={{ pointerEvents: 'none' }}
-      >
-        {`${name} ${(percent * 100).toFixed(0)}%`}
-      </text>
-    );
-  };
-
-  // Add icon mapping for strategy categories
-  const strategyIcons = {
-    afforestation: '🌳',
-    energy: '⚡',
-    transport: '🚚',
-    waste: '🗑️',
-    efficiency: '💡',
-    default: '📈',
-  };
-  const statusColors = {
-    planned: 'bg-gray-200 text-gray-700',
-    'in progress': 'bg-yellow-100 text-yellow-800',
-    completed: 'bg-green-100 text-green-800',
-  };
-
-  // Add state for modal
-  const [selectedStrategy, setSelectedStrategy] = useState<any | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
-
-  // Helper for formatting numbers
-  const fmt = (n: number) => typeof n === 'number' ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : n;
-
-  // Export Data as PDF
   const handleExportPDF = async () => {
-    setExporting(true);
     const doc = new jsPDF({ unit: "pt", format: "a4" });
     const pageWidth = doc.internal.pageSize.getWidth();
     let y = 40;
 
     // Add colored background
-    doc.setFillColor(240, 255, 245); // light greenish
+    doc.setFillColor(240, 255, 245);
     doc.rect(0, 0, pageWidth, 842, 'F');
-
-    // Add logo (SVG)
-    try {
-      const img = await fetch("/placeholder.svg").then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.readAsDataURL(blob);
-      }));
-      doc.addImage(img, "SVG", pageWidth / 2 - 40, y, 80, 80);
-    } catch {}
-    y += 100;
 
     // Heading
     doc.setFontSize(22);
     doc.setTextColor(34, 139, 34);
     doc.text("CoalMineNetZero: Carbon Emissions Dashboard Report", pageWidth / 2, y, { align: "center" });
-    y += 36;
-    doc.setFontSize(13);
-    doc.setTextColor(60, 60, 60);
-    doc.text(
-      "This report summarizes your mine's carbon emissions, offsets, net carbon balance, and sustainability progress. All data is based on the latest entries and calculations from the dashboard.",
-      pageWidth / 2,
-      y,
-      { align: "center", maxWidth: pageWidth - 120 }
-    );
-    y += 40;
+    y += 100;
 
-    // Stats summary (left label, right value, bold, color-coded)
-    const statXLabel = 80;
-    const statXValue = pageWidth - 80;
-    const statLineHeight = 24;
-    doc.setFontSize(15);
+    // Stats summary
     const statRows = [
-      { label: "Total CO₂ Emissions:", value: `${fmt(totalEmissions)} tonnes`, color: 'black' },
-      { label: "Carbon Offsets:", value: `${fmt(totalCarbonSinks)} tonnes`, color: 'green' },
-      { label: "Net Carbon Balance:", value: `${fmt(netCarbonBalance)} tonnes`, color: netCarbonBalance < 0 ? 'green' : 'red' },
+      { label: "Total CO₂ Emissions:", value: `${totalEmissions.toFixed(2)} tonnes`, color: 'red' },
+      { label: "Carbon Offsets:", value: `${totalCarbonSinks.toFixed(2)} tonnes`, color: 'green' },
+      { label: "Net Carbon Balance:", value: `${netEmissions.toFixed(2)} tonnes`, color: netEmissions < 0 ? 'green' : 'red' },
       { label: "Reduction Achieved:", value: `${reductionPercentage.toFixed(1)}%`, color: 'green' },
       { label: "Sustainability Score:", value: `${sustainabilityScore.toFixed(1)}/10`, color: 'green' },
-      { label: "Carbon Credits:", value: `${fmt(carbonCredit)} tonnes`, color: carbonCredit > 0 ? 'green' : 'gray' },
     ];
+
     statRows.forEach((row, idx) => {
       doc.setFont("helvetica", "normal");
       doc.setTextColor(34, 139, 34);
-      doc.text(row.label, statXLabel, y + idx * statLineHeight);
+      doc.text(row.label, 80, y + idx * 24);
       doc.setFont("helvetica", "bold");
       if (row.color === 'green') doc.setTextColor(34, 139, 34);
       else if (row.color === 'red') doc.setTextColor(200, 0, 0);
-      else if (row.color === 'gray') doc.setTextColor(120, 120, 120);
       else doc.setTextColor(34, 34, 34);
-      doc.text(row.value, statXValue, y + idx * statLineHeight, { align: "right" });
+      doc.text(row.value, pageWidth - 80, y + idx * 24, { align: "right" });
     });
-    y += statRows.length * statLineHeight + 20;
 
-    // Add pie chart as image (large, centered)
-    const pieChartEl = document.querySelector('.recharts-wrapper');
-    if (pieChartEl) {
-      const canvas = await html2canvas(pieChartEl as HTMLElement, { backgroundColor: null, scale: 2 });
-      const imgData = canvas.toDataURL('image/png');
-      doc.setFontSize(16);
-      doc.setTextColor(34, 139, 34);
-      doc.text("Emissions by Activity", pageWidth / 2, y, { align: "center" });
-      y += 18;
-      doc.addImage(imgData, 'PNG', pageWidth / 2 - 160, y, 320, 220);
-      y += 230;
-      // Add legend below chart
-      const legendY = y;
-      let legendX = 80;
-      pieChartData.forEach((entry, idx) => {
-        doc.setFillColor(entry.color);
-        doc.circle(legendX + 7, legendY, 6, 'F');
-        doc.setFontSize(12);
-        doc.setTextColor(34, 139, 34);
-        doc.text(entry.name, legendX + 18, legendY + 4);
-        doc.setTextColor(80, 80, 80);
-        doc.text(`${((entry.value / pieChartData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(0)}%`, legendX + 90, legendY + 4);
-        legendX += 140;
-        if ((idx + 1) % 3 === 0) {
-          legendX = 80;
-          y += 20;
-        }
-      });
-      y += 30;
-    }
-
-    // Add signature and seal
-    doc.setFontSize(12);
-    doc.setTextColor(60, 60, 60);
-    doc.text("_________________________", pageWidth - 200, 760, { align: "left" });
-    doc.text("Authorized Signatory", pageWidth - 200, 780, { align: "left" });
-    doc.setFontSize(12);
-    doc.setTextColor(120, 120, 120);
-    doc.text("(Digitally generated)", pageWidth - 200, 795, { align: "left" });
-    doc.setDrawColor(34, 139, 34);
-    doc.setLineWidth(2);
-    doc.circle(100, 770, 40, 'S');
-    doc.setFontSize(12);
-    doc.setTextColor(34, 139, 34);
-    doc.text("COALMINE", 100, 765, { align: "center" });
-    doc.text("NETZERO", 100, 780, { align: "center" });
-    doc.text("DASHBOARD", 100, 795, { align: "center" });
-
-    // Download PDF
     doc.save("dashboard_report.pdf");
-    setExporting(false);
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 animate-slide-up">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Carbon Emissions Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Welcome back, {user?.name}. Monitor and manage your mine's carbon footprint
+          <h1 className="heading-lg text-gray-900 flex items-center">
+            <span className="mr-3">🌱</span>
+            Carbon Emissions Dashboard
+          </h1>
+          <p className="text-gray-600 mt-2 text-lg">
+            Welcome back, <span className="font-semibold text-green-600">{user?.name}</span>. 
+            Monitor and manage your mine's carbon footprint
           </p>
         </div>
         <div className="flex items-center space-x-4">
           <Select defaultValue="last-6-months">
-            <SelectTrigger className="w-40">
+            <SelectTrigger className="w-40 focus-ring">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -306,16 +216,9 @@ const Dashboard = () => {
               <SelectItem value="last-year">Last Year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" onClick={handleExportPDF} disabled={exporting} className="relative">
-            {exporting && (
-              <span className="absolute left-4 top-1/2 -translate-y-1/2">
-                <svg className="animate-spin h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
-                </svg>
-              </span>
-            )}
-            <span className={exporting ? 'opacity-60' : ''}>Export Data</span>
+          <Button variant="outline" onClick={handleExportPDF} className="ripple focus-ring">
+            <span className="mr-2">📊</span>
+            Export Data
           </Button>
         </div>
       </div>
@@ -323,22 +226,24 @@ const Dashboard = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statsData.map((stat, index) => (
-          <Card key={index} className="relative overflow-hidden">
+          <Card key={index} className="eco-card animate-scale-in" style={{ animationDelay: `${index * 0.1}s` }}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-gray-600">
                 {stat.title}
               </CardTitle>
-              <span className="text-2xl">{stat.icon}</span>
+              <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+                <stat.icon className={`h-5 w-5 ${stat.textColor}`} />
+              </div>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-gray-900">
+              <div className="text-3xl font-bold text-gray-900 mb-2">
                 {stat.value}
-                {stat.unit && <span className="text-sm font-normal text-gray-500">{stat.unit}</span>}
+                {stat.unit && <span className="text-lg font-normal text-gray-500 ml-1">{stat.unit}</span>}
               </div>
-              <div className="flex items-center mt-2">
+              <div className="flex items-center">
                 <Badge 
                   variant={stat.trend === "up" ? "default" : "secondary"}
-                  className="text-xs"
+                  className={`text-xs bg-gradient-to-r ${stat.color} text-white`}
                 >
                   {stat.trend === "up" ? (
                     <TrendingUp className="w-3 h-3 mr-1" />
@@ -356,77 +261,51 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Net Carbon Balance Card */}
-      <Card>
+      {/* Carbon Neutrality Progress */}
+      <Card className="eco-card animate-slide-up">
         <CardHeader>
-          <CardTitle>Net Carbon Balance</CardTitle>
+          <CardTitle className="flex items-center text-xl">
+            <span className="mr-2">🎯</span>
+            Carbon Neutrality Progress
+          </CardTitle>
           <CardDescription>
-            Difference between total emissions and carbon sinks. Aim for zero or negative for net-zero.
+            Your journey towards achieving net-zero emissions
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center py-4">
-            <div className={`text-3xl font-bold ${netBalanceColor}`}>
-              {formatCO2Tonnes(netCarbonBalance)}
-            </div>
-            <div className="text-sm mt-2 text-gray-500">
-              {netCarbonBalance > 0 ? 'Net Carbon Surplus' : 'Net Carbon Deficit'}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Carbon Credits Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Carbon Credits</CardTitle>
-          <CardDescription>
-            Surplus carbon offset available as credits (when sinks exceed emissions)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col items-center justify-center py-4">
-            <div className={`text-3xl font-bold ${carbonCreditColor} flex items-center`}>
-              <span className="mr-2">{carbonCreditIcon}</span>
-              {formatCO2Tonnes(carbonCredit)}
-            </div>
-            <div className="text-sm mt-2 text-gray-500">
-              {carbonCredit > 0 ? 'You have surplus carbon credits!' : 'No surplus credits (yet)'}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Net Emissions Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Carbon Neutrality Progress</CardTitle>
-          <CardDescription>
-            Progress towards achieving net-zero emissions
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-6">
             <div className="flex justify-between text-sm">
               <span>Net Emissions: {formatCO2Tonnes(netEmissions)}</span>
               <span>Target: 0 tonnes CO₂e</span>
             </div>
-            <Progress 
-              value={Math.min((netEmissions / Math.max(totalEmissions, 1)) * 100, 100)} 
-              className="h-3"
-            />
+            <div className="relative">
+              <Progress 
+                value={Math.min((netEmissions / Math.max(totalEmissions, 1)) * 100, 100)} 
+                className="h-4 animate-progress"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 rounded-full opacity-20"></div>
+            </div>
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
+              <div className="p-4 rounded-lg bg-red-50 animate-scale-in" style={{ animationDelay: '0.2s' }}>
                 <div className="text-2xl font-bold text-red-600">{formatCO2Tonnes(totalEmissions)}</div>
-                <div className="text-sm text-gray-500">Total Emissions</div>
+                <div className="text-sm text-gray-500 flex items-center justify-center">
+                  <Factory className="w-4 h-4 mr-1" />
+                  Total Emissions
+                </div>
               </div>
-              <div>
+              <div className="p-4 rounded-lg bg-green-50 animate-scale-in" style={{ animationDelay: '0.4s' }}>
                 <div className="text-2xl font-bold text-green-600">{formatCO2Tonnes(totalCarbonSinks)}</div>
-                <div className="text-sm text-gray-500">Carbon Sinks</div>
+                <div className="text-sm text-gray-500 flex items-center justify-center">
+                  <Leaf className="w-4 h-4 mr-1" />
+                  Carbon Sinks
+                </div>
               </div>
-              <div>
+              <div className="p-4 rounded-lg bg-blue-50 animate-scale-in" style={{ animationDelay: '0.6s' }}>
                 <div className="text-2xl font-bold text-blue-600">{formatCO2Tonnes(netEmissions)}</div>
-                <div className="text-sm text-gray-500">Net Emissions</div>
+                <div className="text-sm text-gray-500 flex items-center justify-center">
+                  <Target className="w-4 h-4 mr-1" />
+                  Net Emissions
+                </div>
               </div>
             </div>
           </div>
@@ -434,11 +313,14 @@ const Dashboard = () => {
       </Card>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Emissions by Activity - Pie Chart */}
-        <Card>
+        <Card className="eco-card animate-slide-left">
           <CardHeader>
-            <CardTitle>Emissions by Activity</CardTitle>
+            <CardTitle className="flex items-center">
+              <span className="mr-2">📊</span>
+              Emissions by Activity
+            </CardTitle>
             <CardDescription>
               Breakdown of CO₂ emissions by source
             </CardDescription>
@@ -457,6 +339,8 @@ const Dashboard = () => {
                       outerRadius={80}
                       fill="#8884d8"
                       dataKey="value"
+                      animationBegin={0}
+                      animationDuration={1500}
                     >
                       {pieChartData.map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
@@ -467,13 +351,16 @@ const Dashboard = () => {
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-500">
-                  No emission data available
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">📈</div>
+                    <p>No emission data available</p>
+                  </div>
                 </div>
               )}
             </div>
             <div className="flex flex-wrap justify-center gap-4 mt-4">
               {pieChartData.map((entry, index) => (
-                <div key={index} className="flex items-center space-x-2 text-sm">
+                <div key={index} className="flex items-center space-x-2 text-sm animate-fade-in" style={{ animationDelay: `${index * 0.1}s` }}>
                   <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></span>
                   <span>{entry.name}</span>
                   <span className="text-gray-500">{((entry.value / pieChartData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(0)}%</span>
@@ -484,9 +371,12 @@ const Dashboard = () => {
         </Card>
 
         {/* Emissions Over Time - Line Chart */}
-        <Card>
+        <Card className="eco-card animate-slide-right">
           <CardHeader>
-            <CardTitle>Emissions Over Time</CardTitle>
+            <CardTitle className="flex items-center">
+              <span className="mr-2">📈</span>
+              Emissions Over Time
+            </CardTitle>
             <CardDescription>
               Monthly CO₂ emissions vs targets
             </CardDescription>
@@ -496,31 +386,36 @@ const Dashboard = () => {
               {emissionsOverTime.length > 0 ? (
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={emissionsOverTime}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                    <XAxis dataKey="month" stroke="#6b7280" />
+                    <YAxis stroke="#6b7280" />
                     <Tooltip formatter={(value) => [formatCO2Value(value as number), 'CO₂e']} />
                     <Legend />
                     <Line 
                       type="monotone" 
                       dataKey="emissions" 
-                      stroke="#dc2626" 
+                      stroke="#ef4444" 
                       strokeWidth={3}
                       name="Actual Emissions"
+                      animationDuration={2000}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="target" 
-                      stroke="#16a34a" 
+                      stroke="#22c55e" 
                       strokeWidth={3}
                       strokeDasharray="5 5"
                       name="Target"
+                      animationDuration={2000}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="h-full flex items-center justify-center text-gray-500">
-                  No time series data available
+                  <div className="text-center">
+                    <div className="text-4xl mb-4">📊</div>
+                    <p>No time series data available</p>
+                  </div>
                 </div>
               )}
             </div>
@@ -529,54 +424,54 @@ const Dashboard = () => {
       </div>
 
       {/* Strategy Progress */}
-      {strategyProgress.length > 0 && (
-        <Card>
+      {strategies.length > 0 && (
+        <Card className="eco-card animate-slide-up">
           <CardHeader>
-            <CardTitle>Strategy Progress</CardTitle>
+            <CardTitle className="flex items-center">
+              <span className="mr-2">🚀</span>
+              Strategy Progress
+            </CardTitle>
             <CardDescription>
               Current progress on carbon reduction strategies
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {strategies.map((strategy, idx) => {
+            <div className="space-y-6">
+              {strategies.slice(0, 3).map((strategy, idx) => {
                 const percent = Math.min(100, Math.round((strategy.currentReduction / (strategy.targetReduction || 1)) * 100));
-                const icon = strategyIcons[strategy.category?.toLowerCase()] || strategyIcons.default;
-                const status = strategy.status?.toLowerCase() || 'planned';
+                const statusColors = {
+                  planned: 'bg-gray-100 text-gray-700',
+                  'in-progress': 'bg-yellow-100 text-yellow-800',
+                  completed: 'bg-green-100 text-green-800',
+                };
+                
                 return (
-                  <div key={idx} className="flex flex-col md:flex-row md:items-center md:justify-between bg-gray-50 rounded-lg p-4 shadow-sm">
+                  <div key={idx} className="flex flex-col md:flex-row md:items-center md:justify-between bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-6 shadow-sm animate-scale-in" style={{ animationDelay: `${idx * 0.2}s` }}>
                     <div className="flex items-center space-x-4">
-                      <span className="text-2xl">{icon}</span>
+                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                        <span className="text-2xl">🎯</span>
+                      </div>
                       <div>
-                        <div className="font-semibold text-lg">{strategy.category}</div>
-                        <div className="text-sm text-gray-500">{strategy.description}</div>
+                        <div className="font-semibold text-lg text-gray-900">{strategy.title}</div>
+                        <div className="text-sm text-gray-600">{strategy.description}</div>
                       </div>
                     </div>
                     <div className="flex-1 md:mx-8 mt-4 md:mt-0">
-                      <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                         <div
-                          className="h-3 rounded-full bg-green-500 transition-all"
+                          className="h-3 rounded-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-1000 ease-out animate-progress"
                           style={{ width: `${percent}%` }}
                         ></div>
                       </div>
                       <div className="text-xs text-gray-500 mt-1">{percent}% complete</div>
                     </div>
-                    <div className="flex flex-col items-end space-y-1 mt-4 md:mt-0 min-w-[120px]">
-                      <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[status]}`}>{strategy.status}</span>
-                      <span className="text-green-700 font-semibold text-sm">{formatCO2Tonnes(strategy.currentReduction)} saved</span>
-                      {strategy.roi && (
-                        <span className="text-blue-700 text-xs">ROI: {strategy.roi}</span>
-                      )}
-                      <button
-                        className="mt-2 px-3 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700 transition"
-                        onClick={() => {
-                          console.log('View Details clicked', strategy);
-                          setSelectedStrategy(strategy);
-                          setDetailsOpen(true);
-                        }}
-                      >
-                        View Details
-                      </button>
+                    <div className="flex flex-col items-end space-y-2 mt-4 md:mt-0 min-w-[120px]">
+                      <Badge className={statusColors[strategy.status?.toLowerCase() as keyof typeof statusColors] || statusColors.planned}>
+                        {strategy.status}
+                      </Badge>
+                      <span className="text-green-700 font-semibold text-sm">
+                        {formatCO2Tonnes(strategy.currentReduction)} saved
+                      </span>
                     </div>
                   </div>
                 );
@@ -585,82 +480,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Strategy Details Panel (Sheet) */}
-      <Sheet
-        open={detailsOpen}
-        onOpenChange={(open) => {
-          setDetailsOpen(open);
-          if (!open) setSelectedStrategy(null);
-        }}
-      >
-        <SheetContent side="right" className="max-w-md w-full">
-          {!!selectedStrategy && (
-            <>
-              <SheetHeader>
-                <SheetTitle className="flex items-center space-x-2">
-                  <span className="text-2xl">{strategyIcons[selectedStrategy.category?.toLowerCase()] || strategyIcons.default}</span>
-                  <span>{selectedStrategy.category}</span>
-                </SheetTitle>
-                <SheetDescription>{selectedStrategy.description}</SheetDescription>
-              </SheetHeader>
-              <Separator className="my-2" />
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Status:</span>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${statusColors[selectedStrategy.status?.toLowerCase() || 'planned']}`}>{selectedStrategy.status}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Progress:</span>
-                  <span>{Math.min(100, Math.round((selectedStrategy.currentReduction / (selectedStrategy.targetReduction || 1)) * 100))}%</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>CO₂e Saved:</span>
-                  <span>{formatCO2Tonnes(selectedStrategy.currentReduction)}</span>
-                </div>
-                {selectedStrategy.targetReduction && (
-                  <div className="flex justify-between text-sm">
-                    <span>Target Reduction:</span>
-                    <span>{formatCO2Tonnes(selectedStrategy.targetReduction)}</span>
-                  </div>
-                )}
-                {selectedStrategy.roi && (
-                  <div className="flex justify-between text-sm">
-                    <span>ROI:</span>
-                    <span>{selectedStrategy.roi}</span>
-                  </div>
-                )}
-                {selectedStrategy.implementationTime && (
-                  <div className="flex justify-between text-sm">
-                    <span>Implementation Time:</span>
-                    <span>{selectedStrategy.implementationTime}</span>
-                  </div>
-                )}
-                {selectedStrategy.requiredCost && (
-                  <div className="flex justify-between text-sm">
-                    <span>Required Cost:</span>
-                    <span>₹{selectedStrategy.requiredCost.toLocaleString()}</span>
-                  </div>
-                )}
-                {selectedStrategy.details && (
-                  <div className="text-sm text-gray-700 mt-2">
-                    <span className="font-medium">Details:</span>
-                    <div className="mt-1 whitespace-pre-line">{selectedStrategy.details}</div>
-                  </div>
-                )}
-              </div>
-              <SheetFooter className="mt-4">
-                <button
-                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
-                  onClick={() => setDetailsOpen(false)}
-                >
-                  Close
-                </button>
-              </SheetFooter>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
     </div>
   );
 };

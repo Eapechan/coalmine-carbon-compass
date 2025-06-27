@@ -6,14 +6,13 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/contexts/DataContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAvailableActivityTypes, calculateCO2Emission, formatCO2Value } from "@/lib/calculations";
-import { Loader2, Plus, Upload, Download } from "lucide-react";
+import { Loader2, Plus, Upload, Download, Factory, Zap, Truck, Leaf } from "lucide-react";
 import CSVUpload from "@/components/CSVUpload";
 
 const EmissionInput = () => {
@@ -98,7 +97,7 @@ const EmissionInput = () => {
       setCalculatedCO2(0);
 
       toast({
-        title: "Emission Data Saved",
+        title: "✅ Emission Data Saved",
         description: `Successfully logged ${formatCO2Value(calculatedCO2)}`,
       });
     } catch (error) {
@@ -115,15 +114,8 @@ const EmissionInput = () => {
   const handleDelete = (id: string) => {
     deleteEmission(id);
     toast({
-      title: "Emission Deleted",
+      title: "🗑️ Emission Deleted",
       description: "Emission entry has been removed",
-    });
-  };
-
-  const handleBulkUpload = () => {
-    toast({
-      title: "Bulk Upload",
-      description: "CSV upload feature will be implemented soon",
     });
   };
 
@@ -150,41 +142,68 @@ const EmissionInput = () => {
     window.URL.revokeObjectURL(url);
 
     toast({
-      title: "Export Successful",
+      title: "📊 Export Successful",
       description: "Emission data exported to CSV",
     });
   };
 
+  const getActivityIcon = (activityType: string) => {
+    if (activityType.toLowerCase().includes('diesel') || activityType.toLowerCase().includes('fuel')) {
+      return <Factory className="w-4 h-4" />;
+    }
+    if (activityType.toLowerCase().includes('electricity')) {
+      return <Zap className="w-4 h-4" />;
+    }
+    if (activityType.toLowerCase().includes('transport') || activityType.toLowerCase().includes('vehicle')) {
+      return <Truck className="w-4 h-4" />;
+    }
+    return <Leaf className="w-4 h-4" />;
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Emission Data Input</h1>
-        <p className="text-gray-600 mt-1">Log your coal mine's carbon emissions</p>
+      <div className="animate-slide-up">
+        <h1 className="heading-lg text-gray-900 flex items-center">
+          <span className="mr-3">📊</span>
+          Emission Data Input
+        </h1>
+        <p className="text-gray-600 mt-2 text-lg">Log your coal mine's carbon emissions with real-time calculations</p>
       </div>
 
-      <Tabs defaultValue="manual" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-          <TabsTrigger value="bulk">Bulk Upload</TabsTrigger>
+      <Tabs defaultValue="manual" className="space-y-8">
+        <TabsList className="grid w-full grid-cols-2 bg-green-50 p-1 rounded-xl">
+          <TabsTrigger value="manual" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <span className="mr-2">✏️</span>
+            Manual Entry
+          </TabsTrigger>
+          <TabsTrigger value="bulk" className="rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+            <span className="mr-2">📁</span>
+            Bulk Upload
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="manual" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <TabsContent value="manual" className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Input Form */}
             <div className="lg:col-span-2">
-              <Card>
+              <Card className="eco-card animate-slide-left">
                 <CardHeader>
-                  <CardTitle>Add New Emission Entry</CardTitle>
+                  <CardTitle className="flex items-center text-xl">
+                    <span className="mr-2">📝</span>
+                    Add New Emission Entry
+                  </CardTitle>
                   <CardDescription>
                     Enter emission data for automatic CO₂e calculation using IPCC standards
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="activityType">Activity Type *</Label>
+                        <Label htmlFor="activityType" className="text-sm font-medium">
+                          Activity Type *
+                        </Label>
                         <Select 
                           value={formData.activityType} 
                           onValueChange={(value) => {
@@ -195,13 +214,16 @@ const EmissionInput = () => {
                             }
                           }}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="focus-ring">
                             <SelectValue placeholder="Select emission source" />
                           </SelectTrigger>
                           <SelectContent>
                             {activityTypes.map((type) => (
                               <SelectItem key={type.value} value={type.value}>
-                                {type.label}
+                                <div className="flex items-center space-x-2">
+                                  {getActivityIcon(type.label)}
+                                  <span>{type.label}</span>
+                                </div>
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -209,20 +231,21 @@ const EmissionInput = () => {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="date">Date *</Label>
+                        <Label htmlFor="date" className="text-sm font-medium">Date *</Label>
                         <Input
                           id="date"
                           type="date"
                           value={formData.date}
                           onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                          className="focus-ring"
                           required
                         />
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
-                        <Label htmlFor="quantity">Quantity *</Label>
+                        <Label htmlFor="quantity" className="text-sm font-medium">Quantity *</Label>
                         <Input
                           id="quantity"
                           type="number"
@@ -230,76 +253,80 @@ const EmissionInput = () => {
                           placeholder="Enter quantity"
                           value={formData.quantity}
                           onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                          className="focus-ring"
                           required
                         />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="unit">Unit</Label>
+                        <Label htmlFor="unit" className="text-sm font-medium">Unit</Label>
                         <Input
                           id="unit"
                           value={formData.unit}
                           readOnly
-                          className="bg-gray-50"
+                          className="bg-gray-50 focus-ring"
                         />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="location">Location/Mine Section</Label>
+                      <Label htmlFor="location" className="text-sm font-medium">Location/Mine Section</Label>
                       <Input
                         id="location"
                         placeholder="e.g., Block A, Pit 2, Processing Plant"
                         value={formData.location}
                         onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        className="focus-ring"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="notes">Additional Notes</Label>
+                      <Label htmlFor="notes" className="text-sm font-medium">Additional Notes</Label>
                       <Textarea
                         id="notes"
                         placeholder="Any additional context or details..."
                         value={formData.notes}
                         onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                         rows={3}
+                        className="focus-ring"
                       />
                     </div>
 
                     {/* Calculated CO2 Display */}
                     {calculatedCO2 > 0 && (
-                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="p-6 eco-gradient border border-green-200 rounded-xl animate-scale-in">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="font-semibold text-green-800">Calculated CO₂ Equivalent</h3>
-                            <p className="text-sm text-green-600">Based on IPCC emission factors</p>
+                            <h3 className="font-semibold text-green-800 flex items-center">
+                              <span className="mr-2">🧮</span>
+                              Calculated CO₂ Equivalent
+                            </h3>
+                            <p className="text-sm text-green-600 mt-1">Based on IPCC emission factors</p>
                           </div>
-                          <Badge className="text-lg px-3 py-1 bg-green-600">
+                          <Badge className="text-lg px-4 py-2 sustainability-gradient text-white">
                             {formatCO2Value(calculatedCO2)}
                           </Badge>
                         </div>
                       </div>
                     )}
 
-                    <div className="flex space-x-4">
-                      <Button 
-                        type="submit" 
-                        className="sustainability-gradient text-white"
-                        disabled={isSubmitting || calculatedCO2 === 0}
-                      >
-                        {isSubmitting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Save Emission Data
-                          </>
-                        )}
-                      </Button>
-                    </div>
+                    <Button 
+                      type="submit" 
+                      className="sustainability-gradient text-white ripple focus-ring w-full md:w-auto"
+                      disabled={isSubmitting || calculatedCO2 === 0}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Plus className="mr-2 h-4 w-4" />
+                          Save Emission Data
+                        </>
+                      )}
+                    </Button>
                   </form>
                 </CardContent>
               </Card>
@@ -307,11 +334,14 @@ const EmissionInput = () => {
 
             {/* Recent Entries */}
             <div className="lg:col-span-1">
-              <Card>
+              <Card className="eco-card animate-slide-right">
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle>Recent Entries</CardTitle>
-                    <Button variant="outline" size="sm" onClick={handleExport}>
+                    <CardTitle className="flex items-center">
+                      <span className="mr-2">📋</span>
+                      Recent Entries
+                    </CardTitle>
+                    <Button variant="outline" size="sm" onClick={handleExport} className="ripple">
                       <Download className="h-4 w-4" />
                     </Button>
                   </div>
@@ -321,11 +351,14 @@ const EmissionInput = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {emissions.slice(0, 5).map((entry) => (
-                      <div key={entry.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    {emissions.slice(0, 5).map((entry, index) => (
+                      <div key={entry.id} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-green-50 rounded-lg border border-green-100 animate-scale-in" style={{ animationDelay: `${index * 0.1}s` }}>
                         <div className="flex-1">
-                          <div className="font-medium text-sm">{entry.activityType}</div>
-                          <div className="text-xs text-gray-500">
+                          <div className="font-medium text-sm flex items-center">
+                            {getActivityIcon(entry.activityType)}
+                            <span className="ml-2">{entry.activityType}</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
                             {entry.date} • {entry.quantity} {entry.unit}
                           </div>
                         </div>
@@ -337,7 +370,7 @@ const EmissionInput = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDelete(entry.id)}
-                            className="text-red-500 hover:text-red-700"
+                            className="text-red-500 hover:text-red-700 hover:bg-red-50 mt-1"
                           >
                             Delete
                           </Button>
@@ -345,8 +378,10 @@ const EmissionInput = () => {
                       </div>
                     ))}
                     {emissions.length === 0 && (
-                      <div className="text-center text-gray-500 py-8">
-                        No emission entries yet
+                      <div className="text-center text-gray-500 py-12">
+                        <div className="text-4xl mb-4">📊</div>
+                        <p>No emission entries yet</p>
+                        <p className="text-sm mt-2">Start by adding your first entry</p>
                       </div>
                     )}
                   </div>
@@ -356,62 +391,76 @@ const EmissionInput = () => {
           </div>
         </TabsContent>
 
-        <TabsContent value="bulk" className="space-y-6">
-          <CSVUpload />
+        <TabsContent value="bulk" className="space-y-8">
+          <div className="animate-slide-up">
+            <CSVUpload />
+          </div>
         </TabsContent>
       </Tabs>
 
       {/* All Entries Table */}
-      <Card>
+      <Card className="eco-card animate-slide-up">
         <CardHeader>
-          <CardTitle>All Emission Entries</CardTitle>
+          <CardTitle className="flex items-center">
+            <span className="mr-2">📊</span>
+            All Emission Entries
+          </CardTitle>
           <CardDescription>
-            Complete history of emission data
+            Complete history of emission data with real-time calculations
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Activity</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>CO₂e</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {emissions.map((entry) => (
-                <TableRow key={entry.id}>
-                  <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
-                  <TableCell>{entry.activityType}</TableCell>
-                  <TableCell>{entry.quantity} {entry.unit}</TableCell>
-                  <TableCell className="font-medium text-green-600">
-                    {formatCO2Value(entry.co2e)}
-                  </TableCell>
-                  <TableCell>{entry.location || '-'}</TableCell>
-                  <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(entry.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {emissions.length === 0 && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center text-gray-500 py-8">
-                    No emission entries found
-                  </TableCell>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Activity</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>CO₂e</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Actions</TableHead>
                 </TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {emissions.map((entry, index) => (
+                  <TableRow key={entry.id} className="animate-fade-in" style={{ animationDelay: `${index * 0.05}s` }}>
+                    <TableCell>{new Date(entry.date).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center">
+                        {getActivityIcon(entry.activityType)}
+                        <span className="ml-2">{entry.activityType}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>{entry.quantity} {entry.unit}</TableCell>
+                    <TableCell className="font-medium text-green-600">
+                      {formatCO2Value(entry.co2e)}
+                    </TableCell>
+                    <TableCell>{entry.location || '-'}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDelete(entry.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 ripple"
+                      >
+                        Delete
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {emissions.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="text-center text-gray-500 py-12">
+                      <div className="text-4xl mb-4">📊</div>
+                      <p>No emission entries found</p>
+                      <p className="text-sm mt-2">Start by adding your first emission entry above</p>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>
