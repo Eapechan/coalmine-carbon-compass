@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,10 +6,35 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import { useData } from "@/contexts/DataContext";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 
 const Strategy = () => {
   const { toast } = useToast();
   const [selectedStrategy, setSelectedStrategy] = useState<string | null>(null);
+  const [detailsStrategy, setDetailsStrategy] = useState<any | null>(null);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{role: 'user' | 'assistant', content: string}[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const [chatProvider, setChatProvider] = useState<'llama3'>('llama3');
+  const [llamaError, setLlamaError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [chatPosition, setChatPosition] = useState({ x: 0, y: 0 });
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+
+  const OLLAMA_URL = "http://localhost:11434/api/chat";
+  const OLLAMA_MODEL = "llama3";
+
+  const { emissions, getTotalEmissions, getTotalCarbonSinks, getNetEmissions, getReductionPercentage } = useData();
+  const totalEmissions = getTotalEmissions();
+  const totalCarbonSinks = getTotalCarbonSinks();
+  const netEmissions = getNetEmissions();
+  const reductionPercentage = getReductionPercentage();
 
   const strategicRecommendations = [
     {
@@ -118,6 +142,46 @@ const Strategy = () => {
       default: return "📊";
     }
   };
+
+  async function sendMessageToLlama3(message: string) {
+    setChatMessages((msgs) => [...msgs, { role: 'user', content: message }]);
+    setChatInput("");
+    setLlamaError(null);
+    setLoading(true);
+    try {
+      const dashboardContext = `Dashboard Data:\nTotal Emissions: ${totalEmissions} tonnes\nTotal Carbon Sinks: ${totalCarbonSinks} tonnes\nNet Emissions: ${netEmissions} tonnes\nReduction %: ${reductionPercentage.toFixed(1)}%\nRecent Emissions: ${emissions.slice(0, 3).map(e => `${e.activityType} (${e.co2e} t on ${e.date})`).join('; ')}`;
+      const res = await fetch(OLLAMA_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: OLLAMA_MODEL,
+          messages: [
+            { role: "system", content: dashboardContext },
+            { role: "user", content: message }
+          ],
+          stream: false
+        }),
+      });
+      setLoading(false);
+      if (!res.ok) {
+        setLlamaError("Llama 3 (Ollama) error: " + res.status + " " + res.statusText);
+        setChatMessages((msgs) => [...msgs, { role: 'assistant', content: "Sorry, Llama 3 (Ollama) is not available. Please ensure Ollama is running and the model is pulled." }]);
+        return;
+      }
+      const data = await res.json();
+      const aiMsg = data.message?.content || "(No response)";
+      setChatMessages((msgs) => [...msgs, { role: 'assistant', content: aiMsg }]);
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+    } catch (err) {
+      setLoading(false);
+      setLlamaError("Network or Ollama error: " + (err instanceof Error ? err.message : String(err)));
+      setChatMessages((msgs) => [...msgs, { role: 'assistant', content: "Sorry, there was an error contacting Llama 3 (Ollama). Please ensure Ollama is running." }]);
+    }
+  }
+
+  async function handleSendChat(message: string) {
+    await sendMessageToLlama3(message);
+  }
 
   return (
     <div className="space-y-6">
@@ -259,7 +323,14 @@ const Strategy = () => {
                       <span className="font-medium">Implementation Time:</span> {strategy.implementation}
                     </div>
                     <div className="space-x-3">
-                      <Button variant="outline" size="sm">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setDetailsStrategy(strategy);
+                          setDetailsOpen(true);
+                        }}
+                      >
                         View Details
                       </Button>
                       <Button 
@@ -368,7 +439,7 @@ const Strategy = () => {
                       reduction target. Focus on transportation electrification to close the gap.
                     </p>
                   </div>
-                  <Button className="w-full" variant="outline">
+                  <Button className="w-full" variant="outline" onClick={() => setChatOpen(true)}>
                     💬 Chat with AI Assistant
                   </Button>
                 </div>
@@ -377,8 +448,218 @@ const Strategy = () => {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Sheet
+        open={detailsOpen}
+        onOpenChange={(open) => {
+          setDetailsOpen(open);
+          if (!open) setDetailsStrategy(null);
+        }}
+      >
+        <SheetContent side="right" className="max-w-md w-full">
+          {!!detailsStrategy && (
+            <>
+              <SheetHeader>
+                <SheetTitle className="flex items-center space-x-2">
+                  <span className="text-2xl">{getCategoryIcon(detailsStrategy.category)}</span>
+                  <span>{detailsStrategy.title}</span>
+                </SheetTitle>
+                <SheetDescription>{detailsStrategy.description}</SheetDescription>
+              </SheetHeader>
+              <div className="grid grid-cols-2 gap-4 my-4">
+                <div className="bg-green-50 rounded-lg p-3 text-center">
+                  <div className="font-semibold text-green-700">{detailsStrategy.co2Reduction}</div>
+                  <div className="text-xs text-gray-600">CO₂ Reduction</div>
+                </div>
+                <div className="bg-blue-50 rounded-lg p-3 text-center">
+                  <div className="font-semibold text-blue-700">{detailsStrategy.costSaving}</div>
+                  <div className="text-xs text-gray-600">Annual Savings</div>
+                </div>
+                <div className="bg-orange-50 rounded-lg p-3 text-center">
+                  <div className="font-semibold text-orange-700">{detailsStrategy.investment}</div>
+                  <div className="text-xs text-gray-600">Investment</div>
+                </div>
+                <div className="bg-purple-50 rounded-lg p-3 text-center">
+                  <div className="font-semibold text-purple-700">{detailsStrategy.roi}</div>
+                  <div className="text-xs text-gray-600">Payback Period</div>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Environmental Impact:</span>
+                  <span>{detailsStrategy.impact}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Implementation Feasibility:</span>
+                  <span>{detailsStrategy.feasibility}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>AI Confidence:</span>
+                  <span>{detailsStrategy.aiConfidence}%</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>Implementation Time:</span>
+                  <span>{detailsStrategy.implementation}</span>
+                </div>
+              </div>
+              <SheetFooter className="mt-4">
+                <button
+                  className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300 transition"
+                  onClick={() => setDetailsOpen(false)}
+                >
+                  Close
+                </button>
+              </SheetFooter>
+            </>
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Floating Chat Button */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-6 right-6 z-50 bg-white/60 backdrop-blur-md shadow-lg rounded-full p-4 border border-white/30 hover:bg-white/80 transition flex items-center gap-2"
+          style={{ boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)' }}
+          aria-label="Open AI Chat Assistant"
+        >
+          <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" fill="none" /><path strokeLinecap="round" strokeLinejoin="round" d="M8 12h8M12 8v8" /></svg>
+          <span className="font-semibold text-blue-700 hidden md:inline">AI Assistant</span>
+        </button>
+      )}
+
+      {/* Floating Glass Chat Panel */}
+      {chatOpen && (
+        <div
+          ref={chatPanelRef}
+          className="fixed z-50 w-[95vw] max-w-md bottom-6 right-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-2xl border border-white/30 flex flex-col"
+          style={{
+            boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+            cursor: isDragging ? 'grabbing' : 'default',
+            transform: `translate(${chatPosition.x}px, ${chatPosition.y}px)`
+          }}
+          onMouseDown={e => {
+            if ((e.target as HTMLElement).classList.contains('chat-drag-handle')) {
+              setIsDragging(true);
+              setDragOffset({ x: e.clientX - chatPosition.x, y: e.clientY - chatPosition.y });
+            }
+          }}
+          onMouseUp={() => setIsDragging(false)}
+          onMouseMove={e => {
+            if (isDragging) {
+              setChatPosition({ x: e.clientX - dragOffset.x, y: e.clientY - dragOffset.y });
+            }
+          }}
+          onMouseLeave={() => setIsDragging(false)}
+        >
+          {/* Drag handle and close button */}
+          <div className="chat-drag-handle flex items-center justify-between px-4 py-2 cursor-move select-none bg-white/40 rounded-t-2xl border-b border-white/20">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">🤖</span>
+              <span className="font-semibold text-blue-700">AI Assistant</span>
+            </div>
+            <button
+              onClick={() => setChatOpen(false)}
+              className="text-gray-500 hover:text-red-500 transition text-xl font-bold px-2"
+              aria-label="Close Chat"
+            >
+              ×
+            </button>
+          </div>
+          <div className="px-4 pt-2 pb-3 flex-1 flex flex-col min-h-[350px] max-h-[70vh] overflow-y-auto">
+            {/* Alerts */}
+            {totalEmissions > 1000 && chatOpen && (
+              <Alert variant="destructive" className="mb-4 mt-2">
+                <AlertTitle>⚠️ Warning: Emissions are critically high!</AlertTitle>
+                <AlertDescription>
+                  Your total CO₂ emissions exceed 1000 tonnes. Immediate action is recommended.
+                </AlertDescription>
+              </Alert>
+            )}
+            {llamaError && (
+              <Alert variant="destructive" className="mb-4 mt-2">
+                <AlertTitle>Llama 3 (Ollama) Error</AlertTitle>
+                <AlertDescription>
+                  {llamaError}<br />
+                  <span>Please ensure Ollama is running and the Llama 3 model is available locally.</span>
+                </AlertDescription>
+              </Alert>
+            )}
+            {/* Chat messages */}
+            <div className="flex-1 overflow-y-auto my-2 px-1">
+              {chatMessages.length === 0 && !loading && (
+                <div className="text-gray-400 text-center mt-12">Start the conversation...</div>
+              )}
+              {chatMessages.map((msg, idx) => (
+                <div key={idx} className={`mb-3 flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`rounded-lg px-4 py-2 max-w-xs ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white/80 text-gray-900 border border-white/40'}`}>{
+                    msg.role === 'assistant' ? (
+                      <ChatFormattedResponse content={msg.content} />
+                    ) : (
+                      msg.content
+                    )
+                  }</div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex justify-center items-center mt-8 mb-4">
+                  <svg className="animate-spin h-7 w-7 text-blue-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path></svg>
+                  <span className="text-blue-600 font-medium">AI is thinking...</span>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+            {/* Input */}
+            <form
+              className="flex gap-2 mt-auto"
+              onSubmit={e => {
+                e.preventDefault();
+                if (chatInput.trim() && !loading) handleSendChat(chatInput.trim());
+              }}
+            >
+              <input
+                className="flex-1 border rounded px-3 py-2 focus:outline-none bg-white/70"
+                placeholder="Type your message..."
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                autoFocus
+                disabled={loading}
+              />
+              <button
+                type="submit"
+                className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+                disabled={!chatInput.trim() || loading}
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+// Helper component to format AI response
+function ChatFormattedResponse({ content }: { content: string }) {
+  // Split into lines and detect points
+  const lines = content.split(/\r?\n/).filter(line => line.trim() !== '');
+  const isList = lines.length > 1 && lines.every(line => /^\d+\.|[-*•]/.test(line.trim()));
+  if (isList) {
+    return (
+      <ul className="list-disc pl-5 space-y-1">
+        {lines.map((line, i) => (
+          <li key={i}>{line.replace(/^\d+\.|[-*•]\s*/, '').trim()}</li>
+        ))}
+      </ul>
+    );
+  }
+  // Otherwise, show as paragraphs
+  return (
+    <div className="space-y-2">
+      {lines.map((line, i) => <p key={i}>{line}</p>)}
+    </div>
+  );
+}
 
 export default Strategy;

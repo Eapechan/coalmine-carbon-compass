@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -7,20 +6,39 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useAuth } from "@/contexts/AuthContext";
+import { Loader2 } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
     role: ""
   });
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("Login attempt:", formData);
-    // Simulate login success
-    navigate("/");
+    setError("");
+    
+    if (!formData.email || !formData.password || !formData.role) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    try {
+      const success = await login(formData.email, formData.password, formData.role);
+      if (success) {
+        navigate("/");
+      } else {
+        setError("Invalid credentials. Please check your email, password, and role.");
+      }
+    } catch (err) {
+      setError("An error occurred during login. Please try again.");
+    }
   };
 
   return (
@@ -40,6 +58,14 @@ const Login = () => {
           </CardHeader>
 
           <CardContent>
+            {error && (
+              <Alert className="mb-4 border-red-200 bg-red-50">
+                <AlertDescription className="text-red-800">
+                  {error}
+                </AlertDescription>
+              </Alert>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
@@ -49,6 +75,7 @@ const Login = () => {
                   placeholder="your.email@coalmine.gov.in"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  disabled={isLoading}
                   required
                 />
               </div>
@@ -61,13 +88,18 @@ const Login = () => {
                   placeholder="Enter your password"
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  disabled={isLoading}
                   required
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="role">Role</Label>
-                <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                <Select 
+                  value={formData.role} 
+                  onValueChange={(value) => setFormData({ ...formData, role: value })}
+                  disabled={isLoading}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Select your role" />
                   </SelectTrigger>
@@ -79,10 +111,31 @@ const Login = () => {
                 </Select>
               </div>
 
-              <Button type="submit" className="w-full sustainability-gradient text-white">
-                Sign In
+              <Button 
+                type="submit" 
+                className="w-full sustainability-gradient text-white"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Signing In...
+                  </>
+                ) : (
+                  "Sign In"
+                )}
               </Button>
             </form>
+
+            {/* Demo Credentials */}
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-semibold text-blue-800 mb-2">Demo Credentials:</h4>
+              <div className="text-sm text-blue-700 space-y-1">
+                <p><strong>Mine Operator:</strong> operator@coalmine.gov.in / password123</p>
+                <p><strong>Regulator:</strong> regulator@cpcb.gov.in / password123</p>
+                <p><strong>Admin:</strong> admin@coalmine.gov.in / password123</p>
+              </div>
+            </div>
           </CardContent>
 
           <Separator />

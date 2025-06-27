@@ -1,73 +1,213 @@
-# Welcome to your Lovable project
+# CoalMine Carbon Compass 🌱
 
-## Project info
+A comprehensive carbon neutrality platform designed specifically for Indian coal mines to track, manage, and reduce their carbon footprint while working towards India's Net Zero Mission 2070.
 
-**URL**: https://lovable.dev/projects/6546fd98-009d-4b74-be9c-0264db3a1d2e
+## 🚀 Features
 
-## How can I edit this code?
+### 🔐 Authentication System
+- **Multi-role Support**: Mine Operators, Regulators, and Administrators
+- **Secure Login**: Role-based access control
+- **Session Management**: Persistent login with localStorage
 
-There are several ways of editing your application.
+### 📊 Real-time Dashboard
+- **Live Statistics**: Total emissions, carbon offsets, reduction percentages
+- **Interactive Charts**: Pie charts, line charts, and progress indicators
+- **Carbon Neutrality Progress**: Visual progress towards net-zero goals
+- **Sustainability Score**: Dynamic scoring based on performance
 
-**Use Lovable**
+### 📝 Emission Management
+- **IPCC Standards**: Real CO₂ calculations using IPCC emission factors
+- **Multiple Sources**: Diesel, electricity, transport, equipment, refrigerants
+- **Automatic Calculations**: Real-time CO₂ equivalent calculations
+- **Data Export**: CSV export functionality
+- **Bulk Upload**: Advanced CSV import with validation and preview
+  - **Drag & Drop**: Intuitive file upload interface
+  - **Template Download**: Pre-formatted CSV template
+  - **Real-time Validation**: Instant error checking and feedback
+  - **Preview Mode**: Review data before import
+  - **Progress Tracking**: Visual import progress with status updates
+  - **Error Handling**: Detailed error reporting for invalid entries
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/6546fd98-009d-4b74-be9c-0264db3a1d2e) and start prompting.
+### 🌿 Carbon Sink Tracking
+- **Offset Projects**: Tree plantations, solar installations, energy efficiency
+- **Real Calculations**: Based on scientific sequestration factors
+- **Project Management**: Track location, description, and progress
+- **Advanced Calculator**: Estimate potential offsets for new projects
 
-Changes made via Lovable will be committed automatically to this repo.
+### 📈 Strategy Management
+- **Reduction Strategies**: Plan and track carbon reduction initiatives
+- **Progress Monitoring**: Real-time updates on strategy implementation
+- **ROI Analysis**: Cost-benefit analysis of sustainability projects
+- **Status Tracking**: Planned, in-progress, and completed projects
 
-**Use your preferred IDE**
+### 📋 Reports & Analytics
+- **Comprehensive Reports**: Detailed emission and offset reports
+- **Trend Analysis**: Historical data visualization
+- **Regulatory Compliance**: Reports for regulatory submissions
+- **Performance Metrics**: Key performance indicators
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## 🛠️ Technology Stack
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Frontend**: React 18 + TypeScript
+- **UI Framework**: Shadcn/ui + Tailwind CSS
+- **Charts**: Recharts
+- **State Management**: React Context API
+- **Routing**: React Router DOM
+- **Forms**: React Hook Form + Zod validation
+- **Build Tool**: Vite
 
-Follow these steps:
+## 🚀 Getting Started
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Prerequisites
+- Node.js 18+ 
+- npm or yarn
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Installation
 
-# Step 3: Install the necessary dependencies.
-npm i
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd coalmine-carbon-compass
+   ```
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Start the development server**
+   ```bash
+   npm run dev
+   ```
+
+4. **Open your browser**
+   Navigate to `http://localhost:5173`
+
+### Demo Credentials
+
+Use these credentials to test the application:
+
+| Role | Email | Password |
+|------|-------|----------|
+| Mine Operator | `operator@coalmine.gov.in` | `password123` |
+| Regulator | `regulator@cpcb.gov.in` | `password123` |
+| Admin | `admin@coalmine.gov.in` | `password123` |
+
+## 📊 Data Management
+
+### Local Storage
+The application uses localStorage for data persistence:
+- `coalmine_user`: User authentication data
+- `coalmine_emissions`: Emission entries
+- `coalmine_carbon_sinks`: Carbon sink projects
+- `coalmine_strategies`: Reduction strategies
+
+### CO₂ Calculations
+All calculations are based on:
+- **IPCC 2006 Guidelines**: Emission factors
+- **CEA 2023**: Indian grid electricity mix
+- **ARAI 2023**: Transport emission factors
+- **Forest Research Institute India**: Carbon sequestration rates
+
+### CSV Upload Format
+The bulk upload feature supports CSV files with the following format:
+
+```csv
+Date,Activity Type,Quantity,Unit,Location,Notes
+2024-01-15,Diesel Fuel,5000,litres,Block A,Heavy equipment operation
+2024-01-14,Electricity,8500,kWh,Processing Plant,Daily operations
 ```
 
-**Edit a file directly in GitHub**
+**Required Fields:**
+- **Date**: YYYY-MM-DD format
+- **Activity Type**: Must match available emission sources
+- **Quantity**: Positive number
+- **Unit**: Measurement unit (auto-filled based on activity type)
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+**Optional Fields:**
+- **Location**: Mine section or location
+- **Notes**: Additional context or details
 
-**Use GitHub Codespaces**
+**Supported Activity Types:**
+- Diesel Fuel (litres)
+- Electricity (kWh)
+- Vehicle Transport (km)
+- Coal Combustion (tonnes)
+- Refrigerants (kg)
+- Equipment Operation (hours)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## 🏗️ Project Structure
 
-## What technologies are used for this project?
+```
+src/
+├── components/          # Reusable UI components
+│   ├── ui/             # Shadcn/ui components
+│   ├── Layout.tsx      # Main layout wrapper
+│   ├── AppSidebar.tsx  # Navigation sidebar
+│   └── CSVUpload.tsx   # Bulk upload component
+├── contexts/           # React contexts
+│   ├── AuthContext.tsx # Authentication state
+│   └── DataContext.tsx # Application data
+├── hooks/              # Custom React hooks
+├── lib/                # Utility functions
+│   ├── calculations.ts # CO₂ calculation logic
+│   └── utils.ts        # General utilities
+├── pages/              # Application pages
+│   ├── Dashboard.tsx   # Main dashboard
+│   ├── EmissionInput.tsx # Emission logging
+│   ├── CarbonSink.tsx  # Carbon sink management
+│   ├── Strategy.tsx    # Strategy planning
+│   ├── Reports.tsx     # Reports and analytics
+│   ├── Login.tsx       # Authentication
+│   └── ...            # Other pages
+└── App.tsx            # Main application component
+```
 
-This project is built with:
+## 🔧 Available Scripts
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
 
-## How can I deploy this project?
+## 🌍 Environmental Impact
 
-Simply open [Lovable](https://lovable.dev/projects/6546fd98-009d-4b74-be9c-0264db3a1d2e) and click on Share -> Publish.
+This platform helps coal mines:
+- **Track Emissions**: Accurate CO₂ footprint measurement
+- **Plan Reductions**: Strategic carbon reduction planning
+- **Achieve Compliance**: Meet regulatory requirements
+- **Support Net Zero**: Contribute to India's 2070 goal
 
-## Can I connect a custom domain to my Lovable project?
+## 🤝 Contributing
 
-Yes, you can!
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+## 📄 License
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🆘 Support
+
+For support and questions:
+- Create an issue in the repository
+- Contact the development team
+- Check the documentation
+
+## 🔮 Future Enhancements
+
+- **Real-time Monitoring**: IoT sensor integration
+- **AI Recommendations**: Machine learning for optimization
+- **Mobile App**: React Native mobile application
+- **API Integration**: Backend server with database
+- **Advanced Analytics**: Predictive modeling and forecasting
+- **GIS Integration**: Geographic information system mapping
+- **Advanced CSV Features**: Excel import, data mapping, batch processing
+
+---
+
+**🇮🇳 Supporting India's Net Zero Mission 2070**  
+*Empowering Coal Mines for Carbon Neutrality*
