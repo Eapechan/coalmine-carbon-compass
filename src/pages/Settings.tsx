@@ -1,5 +1,5 @@
-
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,9 @@ const Settings = () => {
     emergencyAlerts: true
   });
 
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
   const handleSaveProfile = () => {
     toast({
       title: "Profile Updated",
@@ -83,7 +86,7 @@ const Settings = () => {
         <p className="text-gray-600 mt-1">Manage your account, mine profile, and preferences</p>
       </div>
 
-      <Tabs defaultValue="profile" className="space-y-6">
+      <Tabs defaultValue={tabParam || "profile"} className="space-y-6">
         <TabsList>
           <TabsTrigger value="profile">Profile Settings</TabsTrigger>
           <TabsTrigger value="mine">Mine Profile</TabsTrigger>

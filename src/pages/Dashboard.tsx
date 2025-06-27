@@ -12,6 +12,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Separator } from "@/components/ui/separator";
 import { useState } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
+import jsPDF from "jspdf";
+import html2canvas from "html2canvas";
 
 const Dashboard = () => {
   const { user } = useAuth();
@@ -161,6 +163,126 @@ const Dashboard = () => {
   // Add state for modal
   const [selectedStrategy, setSelectedStrategy] = useState<any | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  // Helper for formatting numbers
+  const fmt = (n: number) => typeof n === 'number' ? n.toLocaleString(undefined, { maximumFractionDigits: 2 }) : n;
+
+  // Export Data as PDF
+  const handleExportPDF = async () => {
+    setExporting(true);
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    let y = 40;
+
+    // Add colored background
+    doc.setFillColor(240, 255, 245); // light greenish
+    doc.rect(0, 0, pageWidth, 842, 'F');
+
+    // Add logo (SVG)
+    try {
+      const img = await fetch("/placeholder.svg").then(r => r.blob()).then(blob => new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.readAsDataURL(blob);
+      }));
+      doc.addImage(img, "SVG", pageWidth / 2 - 40, y, 80, 80);
+    } catch {}
+    y += 100;
+
+    // Heading
+    doc.setFontSize(22);
+    doc.setTextColor(34, 139, 34);
+    doc.text("CoalMineNetZero: Carbon Emissions Dashboard Report", pageWidth / 2, y, { align: "center" });
+    y += 36;
+    doc.setFontSize(13);
+    doc.setTextColor(60, 60, 60);
+    doc.text(
+      "This report summarizes your mine's carbon emissions, offsets, net carbon balance, and sustainability progress. All data is based on the latest entries and calculations from the dashboard.",
+      pageWidth / 2,
+      y,
+      { align: "center", maxWidth: pageWidth - 120 }
+    );
+    y += 40;
+
+    // Stats summary (left label, right value, bold, color-coded)
+    const statXLabel = 80;
+    const statXValue = pageWidth - 80;
+    const statLineHeight = 24;
+    doc.setFontSize(15);
+    const statRows = [
+      { label: "Total CO₂ Emissions:", value: `${fmt(totalEmissions)} tonnes`, color: 'black' },
+      { label: "Carbon Offsets:", value: `${fmt(totalCarbonSinks)} tonnes`, color: 'green' },
+      { label: "Net Carbon Balance:", value: `${fmt(netCarbonBalance)} tonnes`, color: netCarbonBalance < 0 ? 'green' : 'red' },
+      { label: "Reduction Achieved:", value: `${reductionPercentage.toFixed(1)}%`, color: 'green' },
+      { label: "Sustainability Score:", value: `${sustainabilityScore.toFixed(1)}/10`, color: 'green' },
+      { label: "Carbon Credits:", value: `${fmt(carbonCredit)} tonnes`, color: carbonCredit > 0 ? 'green' : 'gray' },
+    ];
+    statRows.forEach((row, idx) => {
+      doc.setFont("helvetica", "normal");
+      doc.setTextColor(34, 139, 34);
+      doc.text(row.label, statXLabel, y + idx * statLineHeight);
+      doc.setFont("helvetica", "bold");
+      if (row.color === 'green') doc.setTextColor(34, 139, 34);
+      else if (row.color === 'red') doc.setTextColor(200, 0, 0);
+      else if (row.color === 'gray') doc.setTextColor(120, 120, 120);
+      else doc.setTextColor(34, 34, 34);
+      doc.text(row.value, statXValue, y + idx * statLineHeight, { align: "right" });
+    });
+    y += statRows.length * statLineHeight + 20;
+
+    // Add pie chart as image (large, centered)
+    const pieChartEl = document.querySelector('.recharts-wrapper');
+    if (pieChartEl) {
+      const canvas = await html2canvas(pieChartEl as HTMLElement, { backgroundColor: null, scale: 2 });
+      const imgData = canvas.toDataURL('image/png');
+      doc.setFontSize(16);
+      doc.setTextColor(34, 139, 34);
+      doc.text("Emissions by Activity", pageWidth / 2, y, { align: "center" });
+      y += 18;
+      doc.addImage(imgData, 'PNG', pageWidth / 2 - 160, y, 320, 220);
+      y += 230;
+      // Add legend below chart
+      const legendY = y;
+      let legendX = 80;
+      pieChartData.forEach((entry, idx) => {
+        doc.setFillColor(entry.color);
+        doc.circle(legendX + 7, legendY, 6, 'F');
+        doc.setFontSize(12);
+        doc.setTextColor(34, 139, 34);
+        doc.text(entry.name, legendX + 18, legendY + 4);
+        doc.setTextColor(80, 80, 80);
+        doc.text(`${((entry.value / pieChartData.reduce((sum, d) => sum + d.value, 0)) * 100).toFixed(0)}%`, legendX + 90, legendY + 4);
+        legendX += 140;
+        if ((idx + 1) % 3 === 0) {
+          legendX = 80;
+          y += 20;
+        }
+      });
+      y += 30;
+    }
+
+    // Add signature and seal
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 60);
+    doc.text("_________________________", pageWidth - 200, 760, { align: "left" });
+    doc.text("Authorized Signatory", pageWidth - 200, 780, { align: "left" });
+    doc.setFontSize(12);
+    doc.setTextColor(120, 120, 120);
+    doc.text("(Digitally generated)", pageWidth - 200, 795, { align: "left" });
+    doc.setDrawColor(34, 139, 34);
+    doc.setLineWidth(2);
+    doc.circle(100, 770, 40, 'S');
+    doc.setFontSize(12);
+    doc.setTextColor(34, 139, 34);
+    doc.text("COALMINE", 100, 765, { align: "center" });
+    doc.text("NETZERO", 100, 780, { align: "center" });
+    doc.text("DASHBOARD", 100, 795, { align: "center" });
+
+    // Download PDF
+    doc.save("dashboard_report.pdf");
+    setExporting(false);
+  };
 
   return (
     <div className="space-y-6">
@@ -184,7 +306,17 @@ const Dashboard = () => {
               <SelectItem value="last-year">Last Year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">Export Data</Button>
+          <Button variant="outline" onClick={handleExportPDF} disabled={exporting} className="relative">
+            {exporting && (
+              <span className="absolute left-4 top-1/2 -translate-y-1/2">
+                <svg className="animate-spin h-5 w-5 text-green-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                </svg>
+              </span>
+            )}
+            <span className={exporting ? 'opacity-60' : ''}>Export Data</span>
+          </Button>
         </div>
       </div>
 

@@ -51,6 +51,7 @@ const CarbonSink = () => {
   const [mapCoordinates, setMapCoordinates] = useState({ lat: "", lng: "" });
   const [showMap, setShowMap] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  const [mapsLink, setMapsLink] = useState("");
   
   const [calculatedCO2, setCalculatedCO2] = useState(0);
   const [advancedCalculatedCO2, setAdvancedCalculatedCO2] = useState(0);
@@ -128,6 +129,119 @@ const CarbonSink = () => {
     if (!showMap) {
       // Simulate getting coordinates (in real app, this would integrate with Google Maps API)
       setMapCoordinates({ lat: "23.5937", lng: "78.9629" }); // Default to India center
+    }
+  };
+
+  const parseGoogleMapsLink = (link: string) => {
+    try {
+      // Handle different Google Maps URL formats
+      let coordinates = null;
+      
+      // Format 1: https://www.google.com/maps/place/.../@lat,lng,zoom
+      const placeMatch = link.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (placeMatch) {
+        coordinates = { lat: placeMatch[1], lng: placeMatch[2] };
+      }
+      
+      // Format 2: https://www.google.com/maps?q=lat,lng
+      const queryMatch = link.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (queryMatch) {
+        coordinates = { lat: queryMatch[1], lng: queryMatch[2] };
+      }
+      
+      // Format 3: https://maps.google.com/?ll=lat,lng
+      const llMatch = link.match(/[?&]ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (llMatch) {
+        coordinates = { lat: llMatch[1], lng: llMatch[2] };
+      }
+      
+      // Format 4: https://www.google.com/maps/dir/.../@lat,lng
+      const dirMatch = link.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (dirMatch) {
+        coordinates = { lat: dirMatch[1], lng: dirMatch[2] };
+      }
+      
+      // Format 5: Shortened URLs (maps.app.goo.gl) - these need to be expanded first
+      if (link.includes('maps.app.goo.gl') || link.includes('goo.gl/maps')) {
+        // For shortened URLs, we'll need to handle them differently
+        // For now, we'll show a message to the user
+        return { error: "shortened_url" };
+      }
+      
+      // Format 6: https://www.google.com/maps?q=place+name+lat,lng
+      const placeQueryMatch = link.match(/[?&]q=[^&]*?(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (placeQueryMatch) {
+        coordinates = { lat: placeQueryMatch[1], lng: placeQueryMatch[2] };
+      }
+      
+      // Format 7: https://maps.google.com/maps?q=lat,lng
+      const mapsQueryMatch = link.match(/[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/);
+      if (mapsQueryMatch) {
+        coordinates = { lat: mapsQueryMatch[1], lng: mapsQueryMatch[2] };
+      }
+      
+      return coordinates;
+    } catch (error) {
+      console.error('Error parsing Google Maps link:', error);
+      return null;
+    }
+  };
+
+  const handleMapsLinkPaste = async (link: string) => {
+    setMapsLink(link);
+
+    // If it's a shortened URL, expand it via backend
+    if (link.includes('maps.app.goo.gl') || link.includes('goo.gl/maps')) {
+      try {
+        const res = await fetch(`http://localhost:3001/expand?url=${encodeURIComponent(link)}`);
+        const data = await res.json();
+        if (data.expanded) {
+          // Now parse the expanded URL for coordinates
+          const coords = parseGoogleMapsLink(data.expanded);
+          if (coords && coords.lat && coords.lng) {
+            setMapCoordinates(coords);
+            toast({
+              title: "Location Detected",
+              description: `Coordinates extracted: ${coords.lat}, ${coords.lng}`,
+            });
+          } else {
+            toast({
+              title: "Invalid Expanded Link",
+              description: "Could not extract coordinates from the expanded link.",
+              variant: "destructive"
+            });
+          }
+        } else {
+          toast({
+            title: "Expansion Failed",
+            description: data.error || "Could not expand the shortened URL.",
+            variant: "destructive"
+          });
+        }
+      } catch (err) {
+        toast({
+          title: "Expansion Error",
+          description: "Failed to expand the shortened URL.",
+          variant: "destructive"
+        });
+      }
+      return;
+    }
+
+    // ...existing logic for full URLs...
+    const result = parseGoogleMapsLink(link);
+    if (result && result.lat && result.lng) {
+      setMapCoordinates(result);
+      toast({
+        title: "Location Detected",
+        description: `Coordinates extracted: ${result.lat}, ${result.lng}`,
+      });
+    } else {
+      toast({
+        title: "Invalid Link",
+        description: "Please paste a valid Google Maps link with coordinates. Try right-clicking on the location in Google Maps and selecting 'Share' → 'Copy link'.",
+        variant: "destructive"
+      });
     }
   };
 
@@ -581,6 +695,38 @@ const CarbonSink = () => {
                       {showMap ? "Hide Map" : "Show Map"}
                     </Button>
                   </div>
+
+                  {/* Google Maps Link Input */}
+                  <div className="space-y-2">
+                    <Label>Paste Google Maps Link</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Paste Google Maps URL here..."
+                        value={mapsLink}
+                        onChange={(e) => setMapsLink(e.target.value)}
+                        onPaste={(e) => {
+                          const pastedText = e.clipboardData.getData('text');
+                          if (pastedText.includes('google.com/maps') || pastedText.includes('maps.google.com')) {
+                            setTimeout(() => handleMapsLinkPaste(pastedText), 100);
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => handleMapsLinkPaste(mapsLink)}
+                        disabled={!mapsLink.trim()}
+                      >
+                        Extract
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Supports Google Maps place, directions, and coordinate links. Auto-detects when you paste a link!
+                      <br />
+                      <strong>Tip:</strong> Right-click on a location in Google Maps → "Share" → "Copy link" for the best results.
+                    </p>
+                  </div>
                   
                   {showMap && (
                     <div className="space-y-4">
@@ -602,7 +748,22 @@ const CarbonSink = () => {
                           />
                         </div>
                       </div>
-                      
+
+                      {/* Google Maps Preview */}
+                      {mapCoordinates.lat && mapCoordinates.lng && (
+                        <div className="rounded-lg overflow-hidden border mt-2">
+                          <iframe
+                            width="100%"
+                            height="200"
+                            style={{ border: 0 }}
+                            loading="lazy"
+                            allowFullScreen
+                            src={`https://www.google.com/maps?q=${mapCoordinates.lat},${mapCoordinates.lng}&z=16&output=embed`}
+                            title="Map Preview"
+                          />
+                        </div>
+                      )}
+
                       {/* Placeholder for Google Maps integration */}
                       <div className="h-48 bg-gray-100 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300">
                         <div className="text-center">
